@@ -46,10 +46,12 @@ npx ts-node src/analyser.ts data/manuel.txt
 # Analyser un fichier PDF
 npx ts-node src/analyser.ts data/manuel.pdf
 
-# Avec embeddings TF-IDF local (sans clé API)
+# Avec embeddings Transformers.js local (recommandé, multilingue, offline)
+pnpm add @xenova/transformers  # Installation unique
 npx ts-node src/analyser.ts data/manuel.txt --embed
+# Au 1er lancement : télécharge le modèle (~50MB), puis utilise le cache
 
-# Avec embeddings OpenAI
+# Avec embeddings OpenAI (optionnel)
 OPENAI_API_KEY=sk-... npx ts-node src/analyser.ts data/manuel.txt --embed
 
 # Fichier de sortie personnalisé
@@ -72,6 +74,43 @@ pnpm run analyse:pdf    # Analyse data/manuel.pdf
 pnpm run build          # Compile TypeScript vers dist/
 pnpm run start:dist     # node dist/ (après build)
 ```
+
+## Modes d'embeddings
+
+Le module `embedder.ts` supporte **3 modes** avec sélection automatique :
+
+### Mode 1 : Transformers.js local (✅ Recommandé)
+```bash
+pnpm add @xenova/transformers  # Installation unique
+npx ts-node src/analyser.ts data/manuel.txt --embed
+```
+- **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dims)
+- **Avantages** : 
+  - ✅ 100% gratuit et offline (après 1er téléchargement)
+  - ✅ Multilingue optimisé (français, anglais, etc.)
+  - ✅ Pas de clé API requise
+  - ✅ Exécution locale en Node.js
+- **1er lancement** : Télécharge automatiquement le modèle (~50MB), puis cache local
+
+### Mode 2 : OpenAI (optionnel)
+```bash
+export OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
+pnpm add openai  # Installation requise
+npx ts-node src/analyser.ts data/manuel.txt --embed
+```
+- **Modèle** : `text-embedding-3-small` (1536 dims)
+- **Avantages** : Très performant, multilingue
+- **Inconvénients** : Payant, nécessite une connexion internet
+
+### Mode 3 : TF-IDF local (fallback)
+```bash
+# Automatique si aucun embedding disponible
+npx ts-node src/analyser.ts data/manuel.txt --embed
+```
+- **Avantages** : Aucune dépendance externe, ultra-léger
+- **Inconvénients** : Qualité inférieure aux embeddings neuronaux
+
+**Ordre de priorité** : Transformers.js → OpenAI → TF-IDF.
 
 ## Format de sortie (resultat.json)
 
