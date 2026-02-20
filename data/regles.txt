@@ -1,0 +1,203 @@
+LES GARDIENS DU ROYAUME
+Règles du jeu — Version 2.1
+
+Jeu de stratégie pour 2 à 5 joueurs | À partir de 10 ans | Durée : 45 à 90 minutes
+
+=================================================================
+PRÉSENTATION
+=================================================================
+
+Dans Les Gardiens du Royaume, chaque joueur incarne un seigneur cherchant à
+étendre son influence sur les terres du Royaume d'Elyndor. Collectez des
+ressources, recrutez des Gardiens, conquérez des territoires et construisez
+des bâtiments pour remporter la victoire.
+
+=================================================================
+BUT DU JEU
+=================================================================
+
+Le premier joueur à accumuler 15 points de victoire remporte la partie.
+Les points de victoire s'obtiennent en contrôlant des territoires, en
+construisant des bâtiments, en accomplissant des objectifs secrets et en
+remportant des combats.
+
+=================================================================
+MATÉRIEL
+=================================================================
+
+Le jeu contient les éléments suivants :
+
+  - 1 plateau de jeu modulable (28 tuiles hexagonales de territoire)
+  - 5 tuiles de départ (une par couleur : rouge, bleu, vert, jaune, violet)
+  - 80 cartes Action réparties en 4 catégories
+  - 30 cartes Événement (dos gris)
+  - 20 tuiles Bâtiment (5 types différents)
+  - 50 pions Gardien (10 par joueur, en 5 couleurs)
+  - 6 marqueurs de score en bois
+  - Cubes ressources : 30 Bois (marron), 30 Pierre (gris), 25 Or (jaune),
+    20 Nourriture (vert foncé), 15 Magie (violet)
+  - 2 dés de combat à 6 faces (valeurs : 1, 2, 2, 3, 3, Épée)
+  - 1 jeton Premier Joueur (couronne)
+  - Ce livret de règles
+
+=================================================================
+MISE EN PLACE
+=================================================================
+
+Suivez ces étapes avant chaque partie.
+
+Étape 1 — Assembler le plateau :
+Déposez les tuiles hexagonales de territoire en formant un plateau central
+cohérent. Placez 3 tuiles Ressource supplémentaires au centre.
+
+Étape 2 — Préparer les cartes :
+Mélangez les cartes Action et constituez une pioche face cachée.
+Retournez 5 cartes Action visibles sur la table pour former la rivière.
+Mélangez les cartes Événement séparément.
+
+Étape 3 — Distribuer les ressources de départ :
+Donnez à chaque joueur : 1 tuile de départ, 3 cubes Bois, 2 cubes Nourriture,
+1 cube Or et 3 pions Gardien depuis sa réserve.
+
+Étape 4 — Choisir les positions de départ :
+Désignez un premier joueur au hasard et remettez-lui le jeton Premier Joueur.
+En sens horaire, chaque joueur choisit une tuile hexagonale adjacente au centre
+et y place 2 de ses pions Gardien.
+
+=================================================================
+TOUR DE JEU
+=================================================================
+
+Le jeu se déroule en manches. À chaque manche, les joueurs jouent à tour de
+rôle dans le sens horaire en commençant par le Premier Joueur.
+Chaque tour comprend trois phases obligatoires.
+
+1. Phase de Collecte des Ressources :
+
+Au début de votre tour, collectez des ressources depuis vos territoires.
+Chaque territoire contrôlé produit une ressource indiquée sur sa tuile.
+Prenez les cubes correspondants dans la réserve commune au centre de la table.
+Si vous contrôlez un Entrepôt sur ce territoire, doublez sa production.
+
+2. Phase d'Actions :
+
+Effectuez exactement 2 actions parmi les suivantes (vous pouvez répéter) :
+
+CONSTRUIRE UN BÂTIMENT :
+Dépensez les ressources indiquées sur la tuile Bâtiment souhaitée.
+Placez la tuile sur n'importe quel territoire que vous contrôlez.
+Types de bâtiments disponibles et leurs coûts :
+  - Entrepôt (2 Bois, 1 Pierre) : double la production de ce territoire
+  - Forteresse (3 Pierre, 1 Or) : ajoute +2 en défense sur ce territoire
+  - Marché (2 Bois, 2 Or) : permet d'échanger des ressources à tarif réduit
+  - Tour de Guet (1 Pierre, 1 Bois) : révèle les cartes cachées des adversaires
+  - Temple (2 Magie, 2 Or) : produit 1 cube Magie supplémentaire par tour
+
+RECRUTER UN GARDIEN :
+Dépensez 1 cube Nourriture et 1 cube Or.
+Choisissez entre piocher une carte depuis la rivière ou le dessus de la pioche.
+Placez ensuite 1 pion Gardien de votre réserve sur un territoire que vous contrôlez.
+
+ATTAQUER UN TERRITOIRE :
+Choisissez un territoire adjacent occupé par un adversaire.
+Déclarez l'attaque. Le défenseur peut dépenser 1 cube Magie pour recevoir +1 en défense.
+Lancez 1 dé de combat par pion Gardien engagé dans le combat (maximum 3 dés par camp).
+La face Épée compte pour 2 ; les autres faces indiquent leur valeur numérique.
+Le camp avec le total le plus élevé remporte le combat.
+En cas d'égalité, l'attaquant est repoussé sans perte.
+Le perdant retire 2 pions Gardien de ce territoire dans sa réserve.
+
+COMMERCER :
+Visitez un Marché que vous contrôlez ou rejoignez un partenaire commercial.
+Échangez des ressources selon le taux : 2 ressources identiques contre 1 au choix.
+Avec un accord de commerce avec un autre joueur : taux 1 pour 1.
+
+JOUER UNE CARTE ACTION :
+Jouez une carte de votre main et résolvez immédiatement son effet.
+Défaussez la carte après utilisation dans la pile de défausse.
+Les effets de carte peuvent annuler temporairement des règles normales.
+
+PASSER :
+Renoncez à vos actions ce tour. Piochez 1 carte Action de compensation.
+
+3. Phase de Fin de Tour :
+
+Défaussez l'excédent de cartes pour ne conserver que 5 cartes en main maximum.
+Vérifiez ensuite si une condition de fin de partie est atteinte.
+Passez le jeton Premier Joueur au joueur suivant dans le sens horaire.
+
+=================================================================
+CARTES ÉVÉNEMENT
+=================================================================
+
+À la fin de chaque manche complète, le Premier Joueur tire 1 carte Événement
+et révèle son effet à tous les joueurs.
+
+Les événements peuvent modifier temporairement les règles de production,
+déclencher des catastrophes naturelles, invoquer des créatures errantes ou
+accorder des bonus collectifs. Appliquez immédiatement l'effet de la carte.
+
+=================================================================
+RÈGLES SPÉCIALES
+=================================================================
+
+Surpopulation :
+Si un territoire contient plus de 5 pions Gardien d'un même joueur, retirez
+l'excédent dans sa réserve. Le joueur choisit lesquels retirer.
+
+Territoire Neutre :
+déplacez 1 pion Gardien sur un territoire sans pions pour le revendiquer.
+Aucun coût supplémentaire n'est requis pour occuper un territoire neutre.
+
+Alliance :
+Déclarez une alliance avec un autre joueur au début de votre tour.
+Les alliés ne peuvent pas s'attaquer et peuvent partager des ressources.
+Rompez l'alliance en annonçant "Rupture d'alliance" au début de votre tour.
+
+=================================================================
+CONDITIONS DE VICTOIRE
+=================================================================
+
+Victoire Immédiate :
+Dès qu'un joueur atteint 15 points de victoire pendant son tour, il annonce
+sa victoire et la partie s'arrête immédiatement.
+
+Fin de Partie Forcée :
+Si toutes les cartes Événement sont épuisées, terminez la manche en cours.
+Comptez les points de victoire de chaque joueur. Le total le plus élevé gagne.
+En cas d'égalité, le joueur contrôlant le plus de territoires l'emporte.
+
+Décompte des points de victoire :
+  - 1 point par territoire contrôlé à la fin de chaque manche
+  - 2 points par bâtiment construit (permanent, cumulable)
+  - 3 points par objectif secret accompli (révélé en fin de partie)
+  - 1 point pour chaque combat remporté ce tour
+  - 5 points bonus pour le joueur contrôlant la Citadelle centrale
+
+=================================================================
+VARIANTE : MODE COOPÉRATIF
+=================================================================
+
+Dans ce mode, les joueurs affrontent ensemble la menace des Ombres.
+
+Ajoutez les règles suivantes au début de la partie :
+  - Placez 3 pions Ombre noirs sur les tuiles les plus éloignées du centre.
+  - À la fin de chaque manche, avancez chaque Ombre d'une tuile vers le centre.
+  - Si une Ombre atteint la Citadelle centrale, tous les joueurs perdent.
+  - Les joueurs gagnent s'ils éliminent toutes les Ombres en contrôlant
+    simultanément leurs tuiles d'origine.
+
+En mode coopératif, les échanges entre joueurs sont illimités et gratuits.
+Les combats contre les Ombres : lancez 2 dés par pion attaquant. Résultat
+supérieur ou égal à 7 pour éliminer une Ombre.
+
+=================================================================
+CONSEILS STRATÉGIQUES
+=================================================================
+
+Équilibrez votre développement entre production de ressources et conquête.
+Construire tôt maximise votre production pour les tours suivants.
+Les alliances protègent vos flancs mais méfiez-vous des trahisons soudaines.
+Surveillez les points de victoire de vos adversaires et bloquez ceux qui
+approchent de 15. Contrôler la Citadelle centrale rapporte 5 points bonus qui
+peuvent décider de la victoire en fin de partie.

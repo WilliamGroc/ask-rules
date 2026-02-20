@@ -1,0 +1,39 @@
+{
+  "name": "analyser-ia",
+  "version": "1.0.0",
+  "description": "PoC - Analyse de règles de jeu de société en français avec NLP",
+  "main": "dist/index.js",
+  "scripts": {
+    "add": "ts-node src/index.ts add",
+    "ask": "ts-node src/index.ts ask",
+    "start": "ts-node src/analyser.ts data/regles.txt",
+    "analyse:txt": "ts-node src/analyser.ts data/regles.txt",
+    "analyse:pdf": "ts-node src/analyser.ts data/regles.pdf",
+    "build": "tsc",
+    "start:dist": "node dist/index.js"
+  },
+  "keywords": [
+    "nlp",
+    "jeu-de-societe",
+    "french",
+    "board-game",
+    "analyse",
+    "llm",
+    "ia"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.23.0",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "dotenv": "^17.3.1",
+    "natural": "^8.1.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pdf-parse": "^1.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}
