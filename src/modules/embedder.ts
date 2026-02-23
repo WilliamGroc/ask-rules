@@ -19,12 +19,12 @@ export const EMBEDDING_DIM = 384;
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   let pipeline: any;
-
+  let mod: any;
   try {
     // import() dynamique : compatible ESM (Vite SSR) et CLI tsx.
     // @xenova/transformers expose pipeline comme export nommé (ESM)
     // ou sous .default (interop CJS) selon l'environnement.
-    const mod = await import('@xenova/transformers');
+    mod = await import('@xenova/transformers');
     pipeline = (mod as any).pipeline ?? (mod as any).default?.pipeline;
   } catch {
     throw new Error(
