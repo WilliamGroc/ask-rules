@@ -144,7 +144,7 @@ npx ts-node src/analyser.ts data/manuel.txt --embed
 | Bibliothèque | Usage | Licence |
 |---|---|---|
 | `compromise` | NLP : extraction d'entités et de verbes | MIT |
-| `pdf-parse` | Extraction de texte depuis des PDFs | MIT |
+| `pdfreader` | Extraction de texte depuis des PDFs | Apache 2.0 |
 | `chalk` | Affichage coloré dans le terminal | MIT |
 | `typescript` | Compilation et typage statique | Apache 2.0 |
 | `ts-node` | Exécution TypeScript sans compilation préalable | MIT |

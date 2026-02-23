@@ -27,15 +27,15 @@ import type { RawSection, GameSectionType } from '../types';
 // ── Constantes de découpage ───────────────────────────────────────────────────
 
 /** Nombre minimal de mots de contenu qui doivent suivre un titre pour le valider. */
-const MIN_LOOKAHEAD_WORDS = 20;
+const MIN_LOOKAHEAD_WORDS = 10;  // Réduit pour pdfreader - découpage plus fin
 /** Sections avec moins de mots sont écartées (artefacts, listes de 1-2 mots). */
-const MIN_SECTION_WORDS = 25;
+const MIN_SECTION_WORDS = 15;    // Réduit pour permettre des sections plus petites
 /** Sections avec moins de mots sont fusionnées dans la précédente. */
-const MERGE_THRESHOLD = 50;
+const MERGE_THRESHOLD = 25;      // Réduit pour éviter de fusionner trop de sections
 /** Sections avec plus de mots sont découpées par paragraphes. */
-const MAX_SECTION_WORDS = 600;
+const MAX_SECTION_WORDS = 350;   // Réduit de 600 pour un découpage plus fin
 /** Taille cible d'un chunk lors de la division (en mots). */
-const CHUNK_TARGET_WORDS = 400;
+const CHUNK_TARGET_WORDS = 200;  // Réduit de 400 pour des chunks plus petits
 
 // ── Filtrage de lignes parasites ──────────────────────────────────────────────
 
@@ -43,17 +43,29 @@ const CHUNK_TARGET_WORDS = 400;
  * Détecte les lignes non significatives :
  *   - Séparateurs visuels (===, ---, ***)
  *   - Numéros de page ("Page 3")
- *   - Artefacts de PDF 2 colonnes : "H", "hH", "23", "45"
+ *   - Artefacts de PDF 2 colonnes : "H", "hH", "23", "45", "23HhHh", etc.
  *   - Lignes ≤ 2 chars (fragments PDF, ponctuations isolées)
  *   - Ponctuations seules (";", ".", ")")
+ *   - Lignes avec très peu de contenu alphabétique
  */
-const NOISE_LINE = /^([=\-*#~_]{3,}|Page\s+\d+|[hH\d\s]{1,6}|[^\w]{1,3})$/i;
+const NOISE_LINE = /^([=\-*#~_]{3,}|Page\s+\d+|[hH\d\s]{1,12}|[^\w]{1,3})$/i;
 
 function isNoiseLine(line: string): boolean {
   const t = line.trim();
   if (t.length === 0) return false;   // blank lines are handled separately
   if (t.length <= 2) return true;     // "H", "h", "2", ";", "—", ") "
-  return NOISE_LINE.test(t);
+
+  // Filtre les patterns de bruit standard
+  if (NOISE_LINE.test(t)) return true;
+
+  // Filtre les lignes avec très peu de lettres alphabétiques (probable artifact)
+  // Ex: "23HhHh" a 2 lettres sur 6 chars, "6 7" a 0 lettres sur 3 chars
+  const alphaCount = (t.match(/[a-zàâéèêëîïôùûüç]/gi) || []).length;
+  const totalNonSpace = t.replace(/\s/g, '').length;
+  if (totalNonSpace >= 3 && alphaCount < 2) return true;  // moins de 2 lettres
+  if (totalNonSpace >= 4 && alphaCount / totalNonSpace < 0.3) return true;  // < 30% de lettres
+
+  return false;
 }
 
 // ── Mots indicateurs de contenu (pas de titre) ───────────────────────────────
@@ -230,12 +242,12 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
   }
 
   // 6. Titre en casse mixte, ligne précédée d'un blanc
-  //    Conditions : 2-6 mots, commence par majuscule, pas article/verbe, pas ponctuation finale
+  //    Conditions : 1-8 mots, commence par majuscule, pas article/verbe, pas ponctuation finale
   //    Rejet : ligne contenant ", " (virgule = probablement une phrase)
   if (ctx.prevWasBlank) {
     const wc = wordCount(trimmed);
     if (
-      wc >= 2 && wc <= 6 &&
+      wc >= 1 && wc <= 8 &&
       /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ]/.test(trimmed) &&
       !isContentStarter(trimmed) &&
       !isVerbStarter(trimmed) &&
@@ -244,7 +256,26 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
     ) {
       const title = normalizeTitle(trimmed);
       if (isTrivialTitle(title)) return none;
-      return { isHeading: true, title, niveau: 2 };
+      // Niveau 3 pour les titres d'un seul mot (sous-sous-section)
+      const niveau: 2 | 3 = wc === 1 ? 3 : 2;
+      return { isHeading: true, title, niveau };
+    }
+  }
+
+  // 7. Très court titre isolé (1-3 mots) : permet de capturer des sous-titres même sans blanc
+  //    Plus restrictif : doit être très court et significatif
+  const wc = wordCount(trimmed);
+  if (
+    wc >= 1 && wc <= 3 &&
+    trimmed.length >= 4 &&              // minimum 4 caractères
+    /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ][a-zàâéèêëîïôùûüç\s]+$/.test(trimmed) &&  // commence par maj, suivi de minuscules
+    !isContentStarter(trimmed) &&
+    !isVerbStarter(trimmed) &&
+    !/[.!?;,:(]$/.test(trimmed)        // pas de ponctuation finale
+  ) {
+    const title = normalizeTitle(trimmed);
+    if (!isTrivialTitle(title)) {
+      return { isHeading: true, title, niveau: 3 };
     }
   }
 
