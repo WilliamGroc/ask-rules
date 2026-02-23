@@ -52,7 +52,7 @@ export async function analyseFile(
     const enriched: GameSection = {
       titre: section.titre,
       niveau: section.niveau,
-      type_section: classifySection(section.titre),
+      type_section: classifySection(section.titre, section.contenu),
       contenu: section.contenu,
       entites: nlpResult.entites,
       actions: nlpResult.actions,

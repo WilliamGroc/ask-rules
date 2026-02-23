@@ -9,6 +9,11 @@
  *   5. Numéroté "N. / N)" sans article → niveau 2  (1. Phase de jeu)
  *   6. Titre-case + contexte de blanc  → niveau 2  (Composants du Jeu)
  *
+ * Post-traitement :
+ *   1. Look-ahead : titre non confirmé si < MIN_LOOKAHEAD_WORDS mots le suivent
+ *   2. Merge : sections < MERGE_THRESHOLD mots fusionnées dans la précédente
+ *   3. Split : sections > MAX_SECTION_WORDS mots découpées par paragraphes
+ *
  * Rejets explicites (anti-faux-positifs) :
  *   - Titre commençant par un article / pronom / préposition français
  *   - Titre commençant par un verbe impératif (-ez) ou infinitif (-er/-ir/-re)
@@ -18,6 +23,19 @@
  */
 
 import type { RawSection, GameSectionType } from '../types';
+
+// ── Constantes de découpage ───────────────────────────────────────────────────
+
+/** Nombre minimal de mots de contenu qui doivent suivre un titre pour le valider. */
+const MIN_LOOKAHEAD_WORDS = 20;
+/** Sections avec moins de mots sont écartées (artefacts, listes de 1-2 mots). */
+const MIN_SECTION_WORDS = 25;
+/** Sections avec moins de mots sont fusionnées dans la précédente. */
+const MERGE_THRESHOLD = 50;
+/** Sections avec plus de mots sont découpées par paragraphes. */
+const MAX_SECTION_WORDS = 600;
+/** Taille cible d'un chunk lors de la division (en mots). */
+const CHUNK_TARGET_WORDS = 400;
 
 // ── Filtrage de lignes parasites ──────────────────────────────────────────────
 
@@ -236,23 +254,54 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
 // ── Classification sémantique ─────────────────────────────────────────────────
 
 /**
- * Classifie une section par son titre (correspondance de mots-clés, sans accents).
+ * Classifie une section par son titre et optionnellement par le début de son contenu.
+ * Le contenu (400 premiers caractères) sert de signal secondaire si le titre est neutre.
  */
-export function classifySection(titre: string): GameSectionType {
-  const t = titre
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+export function classifySection(titre: string, contenu = ''): GameSectionType {
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  if (/presentation|introduction|idee.?du.?jeu|contexte|propos/.test(t)) return 'presentation';
-  if (/but.?du.?jeu|objectif|remporter|gagner.?partie/.test(t)) return 'but_du_jeu';
-  if (/materiel|composant|contenu.?boite|piece|hex|tuile|plateau/.test(t)) return 'materiel';
-  if (/mise.?en.?place|preparation|demarrage|avant.?partie|setup/.test(t)) return 'preparation';
-  if (/tour.?de.?jeu|deroulement|phase|action|recrut|construir|attaqu|commerc|passer|mecanique/.test(t)) return 'tour_de_jeu';
+  const t = normalize(titre);
+  const c = normalize(contenu.slice(0, 400));
+
+  if (
+    /presentation|introduction|idee.?du.?jeu|contexte|propos/.test(t) ||
+    /^ce jeu |^dans ce jeu|bienvenue|il etait une fois/.test(c)
+  ) return 'presentation';
+
+  if (
+    /but.?du.?jeu|objectif|remporter|gagner.?partie/.test(t) ||
+    /le but est|pour gagner|pour remporter|condition.{0,10}victoire/.test(c)
+  ) return 'but_du_jeu';
+
+  if (
+    /materiel|composant|contenu.?boite|piece|hex|tuile|plateau/.test(t) ||
+    /dans la boite|contient\s*:|\bx\d|\d\s*x\s*(carte|jeton|tuile|pion|cube)/.test(c)
+  ) return 'materiel';
+
+  if (
+    /mise.?en.?place|preparation|demarrage|avant.?partie|setup/.test(t) ||
+    /avant le premier tour|pour commencer|pour preparer|placez le plateau/.test(c)
+  ) return 'preparation';
+
+  if (
+    /tour.?de.?jeu|deroulement|phase|action|recrut|construir|attaqu|commerc|passer|mecanique/.test(t) ||
+    /a son tour|pendant son tour|le joueur actif|chaque joueur (peut|doit)/.test(c)
+  ) return 'tour_de_jeu';
+
   if (/carte.?evenement|evenement/.test(t)) return 'cartes_evenement';
-  if (/regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(t)) return 'regles_speciales';
-  if (/condition.?victoire|fin.?partie|decompte|score|gagnant|victoire/.test(t)) return 'victoire';
+
+  if (
+    /regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(t)
+  ) return 'regles_speciales';
+
+  if (
+    /condition.?victoire|fin.?partie|decompte|score|gagnant|victoire/.test(t) ||
+    /la partie se termine|decompte final|calculez les points|comptez les points/.test(c)
+  ) return 'victoire';
+
   if (/variante|mode.?cooper|optionnel|coop/.test(t)) return 'variante';
+
   if (/conseil|strategi|astuce|recommandation/.test(t)) return 'conseils';
 
   return 'autre';
@@ -262,8 +311,12 @@ export function classifySection(titre: string): GameSectionType {
 
 /**
  * Découpe le texte brut en sections hiérarchisées.
- * Si le texte contient des marqueurs %%PAGE:N%% (injectés par extractFromPdf),
- * les sections reçoivent les champs page_debut et page_fin.
+ *
+ * Pipeline en 4 phases :
+ *   1. Parsing ligne par ligne → sections brutes
+ *   2. Look-ahead : invalide les titres ayant < MIN_LOOKAHEAD_WORDS mots de contenu
+ *   3. Merge : fusionne les sections < MERGE_THRESHOLD mots dans la précédente
+ *   4. Split : découpe les sections > MAX_SECTION_WORDS par paragraphes (overlap 1 §)
  *
  * @param rawText      - Texte extrait du fichier (PDF ou TXT)
  * @param documentName - Nom du document (titre de la section racine)
@@ -271,45 +324,46 @@ export function classifySection(titre: string): GameSectionType {
 export function parseSections(rawText: string, documentName = 'Jeu'): RawSection[] {
   const rawLines = rawText.split(/\r?\n/);
 
-  const sections: RawSection[] = [];
+  // ── Phase 1 : Parsing ligne par ligne ────────────────────────────────────────
+
+  const pass1: RawSection[] = [];
   let currentTitle = documentName;
   let currentNiveau: 1 | 2 | 3 = 1;
   let currentContent: string[] = [];
-  let prevWasBlank = true; // début de document = comme si précédé d'un blanc
+  let prevWasBlank = true;
 
-  // Suivi des pages (actif uniquement pour les PDFs avec marqueurs %%PAGE:N%%)
   let currentPage: number | undefined = undefined;
   let sectionPage: number | undefined = undefined;
   let lastContentPage: number | undefined = undefined;
 
+  const flushSection = () => {
+    const content = currentContent.join('\n').trim();
+    if (content.length > 0) {
+      pass1.push({
+        titre: currentTitle,
+        contenu: content,
+        niveau: currentNiveau,
+        page_debut: sectionPage,
+        page_fin: lastContentPage,
+      });
+    }
+  };
+
   for (const rawLine of rawLines) {
-    // Marqueur de page injecté par extractFromPdf — mise à jour silencieuse
     const pageMatch = rawLine.match(/^%%PAGE:(\d+)%%$/);
     if (pageMatch) {
       currentPage = parseInt(pageMatch[1], 10);
-      // Si on n'a pas encore de page pour la section courante, l'enregistrer
       if (sectionPage === undefined) sectionPage = currentPage;
       continue;
     }
 
-    // Ignorer les lignes parasites (séparateurs, artefacts PDF…)
     if (isNoiseLine(rawLine)) continue;
 
     const isBlank = rawLine.trim().length === 0;
     const { isHeading, title, niveau } = detectHeading(rawLine, { prevWasBlank });
 
     if (isHeading) {
-      // Flush la section courante si elle a du contenu
-      const content = currentContent.join('\n').trim();
-      if (content.length > 0) {
-        sections.push({
-          titre: currentTitle,
-          contenu: content,
-          niveau: currentNiveau,
-          page_debut: sectionPage,
-          page_fin: lastContentPage,
-        });
-      }
+      flushSection();
       currentTitle = title;
       currentNiveau = niveau;
       currentContent = [];
@@ -317,7 +371,6 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
       lastContentPage = currentPage;
     } else {
       currentContent.push(rawLine);
-      // Mettre à jour la dernière page vue sur une ligne non-vide
       if (!isBlank && currentPage !== undefined) {
         lastContentPage = currentPage;
       }
@@ -325,19 +378,99 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
 
     prevWasBlank = isBlank;
   }
+  flushSection();
 
-  // Flush de la dernière section
-  const content = currentContent.join('\n').trim();
-  if (content.length > 0) {
-    sections.push({
-      titre: currentTitle,
-      contenu: content,
-      niveau: currentNiveau,
-      page_debut: sectionPage,
-      page_fin: lastContentPage,
-    });
+  // ── Phase 2 : Look-ahead — invalide les titres sans contenu suffisant ─────────
+  // Un titre non confirmé (< MIN_LOOKAHEAD_WORDS mots) est rétrogradé :
+  // son titre devient un paragraphe de la section précédente.
+
+  const pass2: RawSection[] = [];
+  for (const section of pass1) {
+    const wc = wordCount(section.contenu);
+
+    if (wc < MIN_LOOKAHEAD_WORDS && section.titre !== documentName) {
+      // Rétrogradation : fusionner avec la section précédente
+      if (pass2.length > 0) {
+        const prev = pass2[pass2.length - 1];
+        prev.contenu = prev.contenu + '\n\n' + section.titre + '\n' + section.contenu;
+        prev.page_fin = section.page_fin ?? prev.page_fin;
+      } else {
+        // Aucune section précédente : promouvoir le titre en contenu
+        pass2.push({ ...section, contenu: section.titre + '\n' + section.contenu });
+      }
+    } else {
+      pass2.push({ ...section });
+    }
   }
 
-  // Filtre les sections trop courtes (artefacts ou listes de 1-2 mots)
-  return sections.filter(s => s.contenu.split(/\s+/).length >= 5);
+  // ── Phase 3 : Merge — fusionne les sections trop courtes ─────────────────────
+
+  const pass3: RawSection[] = [];
+  for (const section of pass2) {
+    const wc = wordCount(section.contenu);
+
+    if (wc < MERGE_THRESHOLD && pass3.length > 0) {
+      const prev = pass3[pass3.length - 1];
+      prev.contenu = prev.contenu + '\n\n' + section.titre + '\n' + section.contenu;
+      prev.page_fin = section.page_fin ?? prev.page_fin;
+    } else {
+      pass3.push({ ...section });
+    }
+  }
+
+  // ── Phase 4 : Split — découpe les sections trop longues par paragraphes ───────
+
+  const result: RawSection[] = [];
+
+  for (const section of pass3) {
+    if (wordCount(section.contenu) <= MAX_SECTION_WORDS) {
+      result.push(section);
+      continue;
+    }
+
+    const paragraphs = section.contenu
+      .split(/\n{2,}/)
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    let chunkParagraphs: string[] = [];
+    let chunkWords = 0;
+    let chunkIndex = 0;
+
+    const emitChunk = () => {
+      if (chunkParagraphs.length === 0) return;
+      const titre =
+        chunkIndex === 0
+          ? section.titre
+          : `${section.titre} (suite ${chunkIndex})`;
+      result.push({
+        titre,
+        contenu: chunkParagraphs.join('\n\n'),
+        niveau: section.niveau,
+        page_debut: section.page_debut,
+        page_fin: section.page_fin,
+      });
+    };
+
+    for (const para of paragraphs) {
+      const paraWords = wordCount(para);
+
+      if (chunkWords + paraWords > CHUNK_TARGET_WORDS && chunkParagraphs.length > 0) {
+        emitChunk();
+        // Overlap : conserver le dernier paragraphe du chunk pour le contexte
+        const overlap = chunkParagraphs[chunkParagraphs.length - 1] ?? '';
+        chunkParagraphs = overlap ? [overlap] : [];
+        chunkWords = wordCount(overlap);
+        chunkIndex++;
+      }
+
+      chunkParagraphs.push(para);
+      chunkWords += paraWords;
+    }
+
+    emitChunk();
+  }
+
+  // ── Filtre final : écarter les sections inférieures à MIN_SECTION_WORDS ───────
+  return result.filter(s => wordCount(s.contenu) >= MIN_SECTION_WORDS);
 }
