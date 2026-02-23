@@ -94,13 +94,25 @@ function wordCount(text: string): number {
 /**
  * Normalise un titre détecté :
  *   - Supprime le deux-points final "Titre :" → "Titre"
+ *   - Supprime les parenthèses vides "Titre ()" → "Titre"
+ *   - Supprime une parenthèse ouvrante non fermée "Titre (" → "Titre"
  *   - Supprime les espaces multiples
  */
 function normalizeTitle(raw: string): string {
   return raw
     .replace(/\s*:\s*$/, '')
+    .replace(/\s*\(\s*\)\s*/g, ' ')  // parenthèses vides : "FRANCE II ()" → "FRANCE II"
+    .replace(/\s*\([^)]*$/, '')       // parenthèse ouverte non fermée : "R&D (" → "R&D"
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
+
+/**
+ * True si le titre normalisé est trop court ou vide pour être significatif.
+ * Évite de promouvoir des artefacts résiduels.
+ */
+function isTrivialTitle(title: string): boolean {
+  return title.length < 2 || title.replace(/[\W\d]/g, '').length < 2;
 }
 
 // ── Détection ALL-CAPS ────────────────────────────────────────────────────────
@@ -134,23 +146,33 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
   const none: HeadingResult = { isHeading: false, title: '', niveau: 2 };
   if (trimmed.length === 0) return none;
 
+  // Rejet anticipé : préfixes de type code "F.2.1.", "A.1.2. TITRE"
+  // Ces patrons apparaissent dans les PDFs comme étiquettes de paragraphe, pas des titres.
+  if (/^[A-Z]\.\d+[.\d]*\s/u.test(trimmed)) return none;
+
   // 1. Markdown ## Titre
   const mdMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
   if (mdMatch) {
     const level = Math.min(mdMatch[1].length, 3) as 1 | 2 | 3;
-    return { isHeading: true, title: normalizeTitle(mdMatch[2]), niveau: level };
+    const title = normalizeTitle(mdMatch[2]);
+    if (isTrivialTitle(title)) return none;
+    return { isHeading: true, title, niveau: level };
   }
 
   // 2. ALL-CAPS : MATÉRIEL / TOUR DE JEU / LES 5 TOURS
   if (isAllCaps(trimmed) && wordCount(trimmed) <= 9 && trimmed.length >= 3) {
     const niveau: 1 | 2 = wordCount(trimmed) >= 2 ? 1 : 2;
-    return { isHeading: true, title: normalizeTitle(trimmed), niveau };
+    const title = normalizeTitle(trimmed);
+    if (isTrivialTitle(title)) return none;
+    return { isHeading: true, title, niveau };
   }
 
   // 3. "Étape N — ..." pattern
   const etapeMatch = trimmed.match(/^(Étape\s+\d+\s*[—\-]\s*[^:]+?)\s*:?\s*$/i);
   if (etapeMatch) {
-    return { isHeading: true, title: normalizeTitle(etapeMatch[1]), niveau: 2 };
+    const title = normalizeTitle(etapeMatch[1]);
+    if (isTrivialTitle(title)) return none;
+    return { isHeading: true, title, niveau: 2 };
   }
 
   // 4. "Titre :" heuristique
@@ -163,9 +185,11 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
       wc <= 6 &&
       !isContentStarter(candidate) &&
       !isVerbStarter(candidate) &&
-      !candidate.includes(', ')          // virgule interne = phrase, pas un titre
+      !candidate.includes(', ')
     ) {
-      return { isHeading: true, title: normalizeTitle(candidate), niveau: 2 };
+      const title = normalizeTitle(candidate);
+      if (isTrivialTitle(title)) return none;
+      return { isHeading: true, title, niveau: 2 };
     }
   }
 
@@ -179,9 +203,11 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
       wc <= 7 &&
       !isContentStarter(candidate) &&
       !isVerbStarter(candidate) &&
-      !/[.!?]$/.test(candidate)        // ne se termine pas comme une phrase
+      !/[.!?]$/.test(candidate)
     ) {
-      return { isHeading: true, title: normalizeTitle(candidate), niveau: 2 };
+      const title = normalizeTitle(candidate);
+      if (isTrivialTitle(title)) return none;
+      return { isHeading: true, title, niveau: 2 };
     }
   }
 
@@ -195,10 +221,12 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
       /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ]/.test(trimmed) &&
       !isContentStarter(trimmed) &&
       !isVerbStarter(trimmed) &&
-      !/[.!?;]$/.test(trimmed) &&          // pas de ponctuation de fin de phrase
-      !trimmed.includes(', ')              // virgule = phrase, pas un titre
+      !/[.!?;(]$/.test(trimmed) &&         // '(' final = fragment (R&D ()
+      !trimmed.includes(', ')
     ) {
-      return { isHeading: true, title: normalizeTitle(trimmed), niveau: 2 };
+      const title = normalizeTitle(trimmed);
+      if (isTrivialTitle(title)) return none;
+      return { isHeading: true, title, niveau: 2 };
     }
   }
 
@@ -217,15 +245,15 @@ export function classifySection(titre: string): GameSectionType {
     .replace(/[\u0300-\u036f]/g, '');
 
   if (/presentation|introduction|idee.?du.?jeu|contexte|propos/.test(t)) return 'presentation';
-  if (/but.?du.?jeu|objectif|remporter|gagner.?partie/.test(t))          return 'but_du_jeu';
+  if (/but.?du.?jeu|objectif|remporter|gagner.?partie/.test(t)) return 'but_du_jeu';
   if (/materiel|composant|contenu.?boite|piece|hex|tuile|plateau/.test(t)) return 'materiel';
   if (/mise.?en.?place|preparation|demarrage|avant.?partie|setup/.test(t)) return 'preparation';
   if (/tour.?de.?jeu|deroulement|phase|action|recrut|construir|attaqu|commerc|passer|mecanique/.test(t)) return 'tour_de_jeu';
-  if (/carte.?evenement|evenement/.test(t))                               return 'cartes_evenement';
+  if (/carte.?evenement|evenement/.test(t)) return 'cartes_evenement';
   if (/regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(t)) return 'regles_speciales';
   if (/condition.?victoire|fin.?partie|decompte|score|gagnant|victoire/.test(t)) return 'victoire';
-  if (/variante|mode.?cooper|optionnel|coop/.test(t))                     return 'variante';
-  if (/conseil|strategi|astuce|recommandation/.test(t))                   return 'conseils';
+  if (/variante|mode.?cooper|optionnel|coop/.test(t)) return 'variante';
+  if (/conseil|strategi|astuce|recommandation/.test(t)) return 'conseils';
 
   return 'autre';
 }
@@ -234,6 +262,8 @@ export function classifySection(titre: string): GameSectionType {
 
 /**
  * Découpe le texte brut en sections hiérarchisées.
+ * Si le texte contient des marqueurs %%PAGE:N%% (injectés par extractFromPdf),
+ * les sections reçoivent les champs page_debut et page_fin.
  *
  * @param rawText      - Texte extrait du fichier (PDF ou TXT)
  * @param documentName - Nom du document (titre de la section racine)
@@ -241,31 +271,56 @@ export function classifySection(titre: string): GameSectionType {
 export function parseSections(rawText: string, documentName = 'Jeu'): RawSection[] {
   const rawLines = rawText.split(/\r?\n/);
 
-  // Pré-filtrage : retirer les lignes parasites
-  const lines = rawLines.filter(l => !isNoiseLine(l));
-
   const sections: RawSection[] = [];
-  let currentTitle   = documentName;
+  let currentTitle = documentName;
   let currentNiveau: 1 | 2 | 3 = 1;
   let currentContent: string[] = [];
-  let prevWasBlank   = true; // début de document = comme si précédé d'un blanc
+  let prevWasBlank = true; // début de document = comme si précédé d'un blanc
 
-  for (const line of lines) {
-    const isBlank = line.trim().length === 0;
+  // Suivi des pages (actif uniquement pour les PDFs avec marqueurs %%PAGE:N%%)
+  let currentPage: number | undefined = undefined;
+  let sectionPage: number | undefined = undefined;
+  let lastContentPage: number | undefined = undefined;
 
-    const { isHeading, title, niveau } = detectHeading(line, { prevWasBlank });
+  for (const rawLine of rawLines) {
+    // Marqueur de page injecté par extractFromPdf — mise à jour silencieuse
+    const pageMatch = rawLine.match(/^%%PAGE:(\d+)%%$/);
+    if (pageMatch) {
+      currentPage = parseInt(pageMatch[1], 10);
+      // Si on n'a pas encore de page pour la section courante, l'enregistrer
+      if (sectionPage === undefined) sectionPage = currentPage;
+      continue;
+    }
+
+    // Ignorer les lignes parasites (séparateurs, artefacts PDF…)
+    if (isNoiseLine(rawLine)) continue;
+
+    const isBlank = rawLine.trim().length === 0;
+    const { isHeading, title, niveau } = detectHeading(rawLine, { prevWasBlank });
 
     if (isHeading) {
       // Flush la section courante si elle a du contenu
       const content = currentContent.join('\n').trim();
       if (content.length > 0) {
-        sections.push({ titre: currentTitle, contenu: content, niveau: currentNiveau });
+        sections.push({
+          titre: currentTitle,
+          contenu: content,
+          niveau: currentNiveau,
+          page_debut: sectionPage,
+          page_fin: lastContentPage,
+        });
       }
-      currentTitle   = title;
-      currentNiveau  = niveau;
+      currentTitle = title;
+      currentNiveau = niveau;
       currentContent = [];
+      sectionPage = currentPage;
+      lastContentPage = currentPage;
     } else {
-      currentContent.push(line);
+      currentContent.push(rawLine);
+      // Mettre à jour la dernière page vue sur une ligne non-vide
+      if (!isBlank && currentPage !== undefined) {
+        lastContentPage = currentPage;
+      }
     }
 
     prevWasBlank = isBlank;
@@ -274,7 +329,13 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
   // Flush de la dernière section
   const content = currentContent.join('\n').trim();
   if (content.length > 0) {
-    sections.push({ titre: currentTitle, contenu: content, niveau: currentNiveau });
+    sections.push({
+      titre: currentTitle,
+      contenu: content,
+      niveau: currentNiveau,
+      page_debut: sectionPage,
+      page_fin: lastContentPage,
+    });
   }
 
   // Filtre les sections trop courtes (artefacts ou listes de 1-2 mots)

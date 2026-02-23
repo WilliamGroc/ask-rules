@@ -22,6 +22,10 @@ export interface RawSection {
   contenu: string;
   /** Niveau hiérarchique : 1 = chapitre principal, 2 = sous-section, 3 = sous-sous-section */
   niveau: 1 | 2 | 3;
+  /** Numéro de la première page du contenu (PDF uniquement, undefined pour TXT) */
+  page_debut?: number;
+  /** Numéro de la dernière page du contenu (PDF uniquement, undefined pour TXT) */
+  page_fin?: number;
 }
 
 /** Résultat de l'analyse NLP française d'une section */
@@ -45,16 +49,20 @@ export type GameMechanic =
   | 'draft_cartes'
   | 'points_victoire'
   | 'cooperation'
-  | 'events';
-
-/** Vecteur d'embedding : dense (OpenAI) ou creux (TF-IDF) */
-export type EmbeddingVector = number[] | Record<string, number>;
+  | 'events'
+  | 'encheres'
+  | 'construction'
+  | 'deduction'
+  | 'mouvement'
+  | 'gestion_main'
+  | 'programmation'
+  | 'role_secret';
 
 /** Section enrichie : contenu + NLP + type + mécaniques */
 export interface GameSection extends RawSection, NlpResult {
   type_section: GameSectionType;
   mecaniques: GameMechanic[];
-  embedding?: EmbeddingVector | null;
+  embedding?: number[] | null;
 }
 
 /** Métadonnées extraites de l'en-tête du document */
@@ -86,14 +94,12 @@ export interface GameAnalysisResult {
   sections: GameSection[];
 }
 
-// ── Base de connaissance ──────────────────────────────────────────────────────
+// ── Base de connaissance (PostgreSQL) ─────────────────────────────────────────
 
-/** Section enrichie d'un vecteur TF-IDF pour la recherche sémantique */
+/** Section enrichie d'un identifiant unique, stockée en base */
 export interface StoredSection extends GameSection {
   /** Identifiant unique : "{jeu_slug}_{index}" */
   section_id: string;
-  /** Vecteur TF-IDF creux (French tokenization) utilisé pour la similarité cosinus */
-  tfidf_vector: Record<string, number>;
 }
 
 /** Entrée dans la base de connaissance pour un jeu */
@@ -106,13 +112,6 @@ export interface KnowledgeBaseEntry {
   metadata: GameMetadata;
   statistiques: Statistics;
   sections: StoredSection[];
-}
-
-/** Base de connaissance complète (persist dans data/knowledge-base.json) */
-export interface KnowledgeBase {
-  version: string;
-  updated_at: string;
-  games: KnowledgeBaseEntry[];
 }
 
 /** Résultat d'une récupération sémantique */

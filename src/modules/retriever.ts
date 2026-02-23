@@ -1,214 +1,249 @@
 /**
  * retriever.ts
- * Recherche sémantique dans la base de connaissance par similarité cosinus TF-IDF.
+ * Recherche sémantique dans PostgreSQL via pgvector (cosinus).
  *
  * Pipeline :
- *   1. Tokenisation française via AggressiveTokenizerFr (natural)
- *   2. Suppression des stopwords
- *   3. Stemming via PorterStemmerFr (natural) → "attaque"/"attaquer" → même stem
- *   4. Construction d'un vecteur TF normalisé (L2)
- *   5. Calcul de la similarité cosinus avec chaque section de la KB
- *   6. Retour des N sections les plus proches
+ *   1. Génère un embedding dense 384 dims de la question (Transformers.js)
+ *   2. Requête pgvector avec l'opérateur <=> (distance cosinus)
+ *   3. Sélection du jeu le plus pertinent
+ *   4. Retour des N sections les plus proches du jeu sélectionné
  */
 
-import { AggressiveTokenizerFr, PorterStemmerFr } from 'natural';
-import type { KnowledgeBase, ScoredSection } from '../types';
-
-const tokenizerFr = new AggressiveTokenizerFr();
-
-// ── Stopwords français ────────────────────────────────────────────────────────
-
-const STOPWORDS_FR = new Set([
-  'le', 'la', 'les', 'l', 'un', 'une', 'des', 'du', 'de', 'd', 'et', 'ou',
-  'mais', 'donc', 'or', 'ni', 'car', 'que', 'qui', 'qu', 'se', 'si', 'en',
-  'y', 'il', 'elle', 'ils', 'elles', 'on', 'nous', 'vous', 'je', 'tu',
-  'ce', 'cet', 'cette', 'ces', 'son', 'sa', 'ses', 'mon', 'ma', 'mes',
-  'ton', 'ta', 'tes', 'leur', 'leurs', 'notre', 'votre', 'vos', 'nos',
-  'a', 'au', 'aux', 'par', 'pour', 'sur', 'sous', 'dans', 'avec', 'sans',
-  'est', 'sont', 'etre', 'avoir', 'fait', 'font', 'peut', 'peuvent',
-  'tout', 'tous', 'toutes', 'toute', 'chaque', 'plus', 'moins', 'tres',
-  'bien', 'aussi', 'alors', 'ainsi', 'dont', 'entre', 'vers', 'doit',
-  'selon', 'afin', 'comme', 'encore', 'pas', 'non', 'oui',
-]);
-
-// ── Vectorisation ─────────────────────────────────────────────────────────────
-
-/**
- * Tokenise et stemme un texte en français.
- * Utilise AggressiveTokenizerFr puis PorterStemmerFr pour normaliser les formes :
- * "attaque", "attaquer", "attaqué" → même stem → matchent entre eux.
- */
-function tokenize(text: string): string[] {
-  const tokens: string[] = tokenizerFr.tokenize(text.toLowerCase()) ?? [];
-  return tokens
-    .filter(w => w.length > 2 && !STOPWORDS_FR.has(w))
-    .map(w => PorterStemmerFr.stem(w));
-}
-
-/**
- * Construit un vecteur TF normalisé (L2) à partir d'un texte.
- * Retourne un objet sparse { stem: poids }.
- */
-export function buildVector(text: string): Record<string, number> {
-  const tokens = tokenize(text);
-  const freq: Record<string, number> = {};
-  tokens.forEach(t => { freq[t] = (freq[t] ?? 0) + 1; });
-
-  const norm = Math.sqrt(Object.values(freq).reduce((s, v) => s + v * v, 0));
-  const vector: Record<string, number> = {};
-  Object.entries(freq).forEach(([term, count]) => {
-    vector[term] = norm > 0 ? count / norm : 0;
-  });
-  return vector;
-}
-
-/**
- * Calcule la similarité cosinus entre deux vecteurs sparses.
- * Retourne un score entre 0 (aucun lien) et 1 (identiques).
- */
-export function cosineSimilarity(
-  v1: Record<string, number>,
-  v2: Record<string, number>,
-): number {
-  let dot = 0, norm1 = 0, norm2 = 0;
-
-  for (const [k, a] of Object.entries(v1)) {
-    dot += a * (v2[k] ?? 0);
-    norm1 += a * a;
-  }
-  for (const v of Object.values(v2)) {
-    norm2 += v * v;
-  }
-
-  const denom = Math.sqrt(norm1) * Math.sqrt(norm2);
-  return denom > 0 ? dot / denom : 0;
-}
-
-// ── Sélection du meilleur jeu ─────────────────────────────────────────────────
+import pool from './db';
+import { generateEmbedding } from './embedder';
+import type { ScoredSection, StoredSection } from '../types';
 
 /** Résultat de la sélection d'un jeu pour une requête donnée. */
 export interface GameSelection {
-  /** Jeu sélectionné */
   jeu: string;
   jeu_id: string;
   /** Score agrégé (somme des top-3 sections) */
   relevanceScore: number;
   /** True si le nom du jeu a été détecté dans la question */
   matchedName: boolean;
-  /** Sections les plus pertinentes du jeu sélectionné */
   sections: ScoredSection[];
 }
 
-/**
- * Vérifie si le nom d'un jeu est mentionné dans une question.
- * Comparaison insensible à la casse et aux accents sur les mots ≥ 4 caractères.
- */
+// ── Utilitaire ────────────────────────────────────────────────────────────────
+
+/** Vérifie si le nom d'un jeu est mentionné dans la question. */
 function gameNameInQuery(gameName: string, query: string): boolean {
   const normalize = (s: string) =>
     s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-  const queryNorm  = normalize(query);
-  const nameWords  = normalize(gameName).split(/\s+/).filter(w => w.length >= 5);
+  const queryNorm = normalize(query);
+  const nameWords = normalize(gameName).split(/\s+/).filter(w => w.length >= 5);
   return nameWords.some(w => queryNorm.includes(w));
 }
 
-/**
- * Sélectionne le jeu le plus pertinent puis retourne ses meilleures sections.
- *
- * Stratégie de sélection (ordre de priorité) :
- *   1. Si KB contient un seul jeu → le choisir directement.
- *   2. Si le nom d'un jeu apparaît littéralement dans la question → ce jeu.
- *   3. Sinon → jeu avec le score TF-IDF agrégé le plus élevé (somme des 3 meilleures sections).
- *
- * @param query  - Question ou mots-clés
- * @param kb     - Base de connaissance
- * @param topN   - Nombre de sections renvoyées
- * @param minScore - Seuil minimal de similarité
- */
-export function retrieveFromBestGame(
-  query: string,
-  kb: KnowledgeBase,
-  topN = 4,
-  minScore = 0.05,
-): GameSelection | null {
-  if (kb.games.length === 0) return null;
+/** Formate un vecteur dense pour pgvector : "[n1,n2,...]" */
+function toVectorLiteral(v: number[]): string {
+  return `[${v.join(',')}]`;
+}
 
-  const queryVector = buildVector(query);
-
-  // Calcule les sections et le score agrégé pour chaque jeu
-  const perGame = kb.games.map(game => {
-    const matchedName = gameNameInQuery(game.jeu, query);
-
-    const scored: ScoredSection[] = game.sections
-      .map(section => ({
-        score: cosineSimilarity(queryVector, section.tfidf_vector),
-        section,
-        jeu: game.jeu,
-        jeu_id: game.id,
-      }))
-      .filter(r => r.score >= minScore)
-      .sort((a, b) => b.score - a.score);
-
-    // Score agrégé = somme des 3 meilleures sections
-    const aggregateScore = scored.slice(0, 3).reduce((s, r) => s + r.score, 0);
-
-    return { game, matchedName, scored, aggregateScore };
-  });
-
-  // Priorité 1 : mention explicite du nom du jeu dans la question
-  const namedMatches = perGame.filter(g => g.matchedName);
-  if (namedMatches.length === 1) {
-    const g = namedMatches[0];
-    return {
-      jeu: g.game.jeu,
-      jeu_id: g.game.id,
-      relevanceScore: g.aggregateScore,
-      matchedName: true,
-      sections: g.scored.slice(0, topN),
-    };
-  }
-
-  // Priorité 2 : score TF-IDF agrégé le plus élevé
-  const best = perGame.reduce((a, b) => b.aggregateScore > a.aggregateScore ? b : a);
-
-  if (best.scored.length === 0) return null;
-
+/** Convertit une ligne PostgreSQL en ScoredSection. */
+function rowToScoredSection(row: Record<string, any>): ScoredSection {
+  const section: StoredSection = {
+    section_id: row.id,
+    titre: row.titre,
+    contenu: row.contenu,
+    niveau: row.niveau as 1 | 2 | 3,
+    type_section: row.type_section,
+    entites: row.entites ?? [],
+    actions: row.actions ?? [],
+    resume: row.resume ?? '',
+    mecaniques: row.mecaniques ?? [],
+    embedding: null, // non rechargé pour économiser la mémoire
+    page_debut: row.page_debut ?? undefined,
+    page_fin: row.page_fin ?? undefined,
+  };
   return {
-    jeu: best.game.jeu,
-    jeu_id: best.game.id,
-    relevanceScore: best.aggregateScore,
-    matchedName: best.matchedName,
-    sections: best.scored.slice(0, topN),
+    score: parseFloat(row.score),
+    section,
+    jeu: row.jeu,
+    jeu_id: row.game_id,
   };
 }
 
-// ── Recherche dans la KB ──────────────────────────────────────────────────────
+// ── Recherche ─────────────────────────────────────────────────────────────────
 
 /**
- * Trouve les sections les plus pertinentes pour une requête textuelle.
+ * Sélectionne le jeu le plus pertinent et retourne ses meilleures sections.
  *
- * @param query    - Question ou mots-clés en français
- * @param kb       - Base de connaissance à interroger
- * @param topN     - Nombre de résultats à retourner (défaut : 4)
- * @param minScore - Score minimum pour être inclus (défaut : 0.05)
+ * Stratégie de sélection (ordre de priorité) :
+ *   1. Seul jeu en base → le choisir directement.
+ *   2. Nom d'un jeu présent littéralement dans la question → ce jeu.
+ *   3. Sinon → jeu avec le score vectoriel agrégé le plus élevé.
+ *
+ * @param query    - Question ou mots-clés
+ * @param topN     - Nombre de sections renvoyées (défaut : 4)
+ * @param minScore - Seuil minimal de similarité cosinus (défaut : 0.1)
  */
-export function retrieveRelevantSections(
+export async function retrieveFromBestGame(
   query: string,
-  kb: KnowledgeBase,
   topN = 4,
-  minScore = 0.05,
-): ScoredSection[] {
-  const queryVector = buildVector(query);
-  const results: ScoredSection[] = [];
+  minScore = 0.1,
+): Promise<GameSelection | null> {
+  // Vérifie qu'il y a des jeux en base
+  const gamesRes = await pool.query<{ id: string; jeu: string }>(
+    'SELECT id, jeu FROM games ORDER BY jeu',
+  );
+  if (gamesRes.rowCount === 0) return null;
 
-  for (const game of kb.games) {
-    for (const section of game.sections) {
-      const score = cosineSimilarity(queryVector, section.tfidf_vector);
-      if (score >= minScore) {
-        results.push({ score, section, jeu: game.jeu, jeu_id: game.id });
-      }
+  const games = gamesRes.rows;
+
+  // Embed la question
+  const queryEmbedding = await generateEmbedding(query);
+  const vectorLiteral = toVectorLiteral(queryEmbedding);
+
+  // Détermine le filtre par jeu selon la stratégie de sélection
+  let targetGameId: string | null = null;
+  let matchedName = false;
+
+  if (games.length === 1) {
+    // Priorité 1 : seul jeu
+    targetGameId = games[0].id;
+  } else {
+    // Priorité 2 : nom du jeu dans la question
+    const named = games.find(g => gameNameInQuery(g.jeu, query));
+    if (named) {
+      targetGameId = named.id;
+      matchedName = true;
     }
   }
 
-  return results.sort((a, b) => b.score - a.score).slice(0, topN);
+  if (targetGameId) {
+    // Recherche directement dans le jeu ciblé
+    return searchWithinGame(
+      targetGameId,
+      games.find(g => g.id === targetGameId)!.jeu,
+      vectorLiteral,
+      topN,
+      minScore,
+      matchedName,
+    );
+  }
+
+  // Priorité 3 : sélectionner le meilleur jeu par score agrégé
+  return selectBestGameByScore(games, vectorLiteral, topN, minScore);
+}
+
+/**
+ * Recherche des sections pour une question dans un jeu spécifique.
+ * Le jeu est identifié par correspondance partielle sur le nom (insensible à la casse).
+ */
+export async function retrieveForGame(
+  query: string,
+  gameName: string,
+  topN = 4,
+): Promise<GameSelection | null> {
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const needle = normalize(gameName);
+
+  const res = await pool.query<{ id: string; jeu: string }>(
+    'SELECT id, jeu FROM games',
+  );
+  const match = res.rows.find(g => normalize(g.jeu).includes(needle));
+  if (!match) return null;
+
+  const queryEmbedding = await generateEmbedding(query);
+  const vectorLiteral = toVectorLiteral(queryEmbedding);
+
+  return searchWithinGame(match.id, match.jeu, vectorLiteral, topN, 0.01, false);
+}
+
+// ── Helpers SQL ───────────────────────────────────────────────────────────────
+
+/** Récupère les topN sections les plus proches d'un jeu donné. */
+async function searchWithinGame(
+  gameId: string,
+  jeu: string,
+  vectorLiteral: string,
+  topN: number,
+  minScore: number,
+  matchedName: boolean,
+): Promise<GameSelection | null> {
+  const res = await pool.query(
+    `SELECT s.id, s.game_id, g.jeu, s.titre, s.contenu, s.niveau,
+            s.type_section, s.entites, s.actions, s.resume, s.mecaniques,
+            s.page_debut, s.page_fin,
+            1 - (s.embedding <=> $1::vector) AS score
+     FROM sections s
+     JOIN games g ON g.id = s.game_id
+     WHERE s.game_id = $2
+       AND s.embedding IS NOT NULL
+       AND 1 - (s.embedding <=> $1::vector) >= $3
+     ORDER BY s.embedding <=> $1::vector
+     LIMIT $4`,
+    [vectorLiteral, gameId, minScore, topN],
+  );
+
+  if (res.rowCount === 0) return null;
+
+  const sections = res.rows.map(rowToScoredSection);
+  const relevanceScore = sections.slice(0, 3).reduce((s, r) => s + r.score, 0);
+
+  return { jeu, jeu_id: gameId, relevanceScore, matchedName, sections };
+}
+
+/**
+ * Récupère des candidats sur tous les jeux, groupe par jeu,
+ * sélectionne celui avec le score agrégé le plus élevé et retourne ses topN sections.
+ */
+async function selectBestGameByScore(
+  games: Array<{ id: string; jeu: string }>,
+  vectorLiteral: string,
+  topN: number,
+  minScore: number,
+): Promise<GameSelection | null> {
+  // On récupère topN * 3 candidats pour avoir assez de données par jeu
+  const limit = topN * games.length * 3;
+
+  const res = await pool.query(
+    `SELECT s.id, s.game_id, g.jeu, s.titre, s.contenu, s.niveau,
+            s.type_section, s.entites, s.actions, s.resume, s.mecaniques,
+            s.page_debut, s.page_fin,
+            1 - (s.embedding <=> $1::vector) AS score
+     FROM sections s
+     JOIN games g ON g.id = s.game_id
+     WHERE s.embedding IS NOT NULL
+       AND 1 - (s.embedding <=> $1::vector) >= $2
+     ORDER BY s.embedding <=> $1::vector
+     LIMIT $3`,
+    [vectorLiteral, minScore, limit],
+  );
+
+  if (res.rowCount === 0) return null;
+
+  const rows = res.rows.map(rowToScoredSection);
+
+  // Groupe les sections par jeu
+  const byGame = new Map<string, ScoredSection[]>();
+  for (const row of rows) {
+    if (!byGame.has(row.jeu_id)) byGame.set(row.jeu_id, []);
+    byGame.get(row.jeu_id)!.push(row);
+  }
+
+  // Sélectionne le jeu avec le score agrégé le plus élevé (top-3 sections)
+  let bestGameId = '';
+  let bestScore = -1;
+
+  for (const [gameId, sections] of byGame) {
+    const aggregate = sections.slice(0, 3).reduce((s, r) => s + r.score, 0);
+    if (aggregate > bestScore) {
+      bestScore = aggregate;
+      bestGameId = gameId;
+    }
+  }
+
+  const bestSections = byGame.get(bestGameId)!;
+  const bestGame = games.find(g => g.id === bestGameId)!;
+
+  return {
+    jeu: bestGame.jeu,
+    jeu_id: bestGameId,
+    relevanceScore: bestScore,
+    matchedName: false,
+    sections: bestSections.slice(0, topN),
+  };
 }

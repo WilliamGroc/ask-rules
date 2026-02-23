@@ -1,0 +1,31 @@
+# Dépendances
+node_modules/
+
+# Artefacts de build
+build/
+dist/
+.svelte-kit/
+.react-router/
+
+# Cache local du modèle (sera téléchargé pendant le build Docker)
+.cache/
+
+# Variables d'environnement locales
+.env
+.env.*
+
+# Données et fichiers temporaires
+data/
+*.tmp
+
+# Fichiers de développement
+*.log
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md

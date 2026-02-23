@@ -26,7 +26,7 @@ Ne répète pas les extraits de règles mot pour mot : synthétise et explique.`
 
 async function queryMistral(question: string, context: string): Promise<LLMResponse> {
   const apiKey = process.env['MISTRAL_API_KEY'] ?? '';
-  const model  = process.env['MISTRAL_MODEL'] ?? 'mistral-small-latest';
+  const model = process.env['MISTRAL_MODEL'] ?? 'mistral-small-latest';
 
   const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
@@ -38,7 +38,7 @@ async function queryMistral(question: string, context: string): Promise<LLMRespo
       model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user',   content: `CONTEXTE :\n${context}\n\nQUESTION : ${question}` },
+        { role: 'user', content: `CONTEXTE :\n${context}\n\nQUESTION : ${question}` },
       ],
       temperature: 0.2,
       max_tokens: 700,
@@ -158,7 +158,7 @@ function fallbackResponse(context: string): LLMResponse {
 
 /**
  * Envoie une question + contexte au LLM disponible.
- * Sélection automatique : OpenAI > Ollama > Fallback.
+ * Sélection automatique : Mistral > OpenAI > Ollama > Fallback.
  *
  * @param question - Question de l'utilisateur
  * @param context  - Contexte extrait de la KB (sections pertinentes formatées)

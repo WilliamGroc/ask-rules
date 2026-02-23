@@ -3,10 +3,10 @@
  *
  * Commandes disponibles :
  *
- *   add   <fichier>  [--embed] [--kb <chemin>]
- *     Analyse un fichier de règles et l'indexe dans la knowledge base.
+ *   add   <fichier>
+ *     Analyse un fichier de règles et l'indexe dans PostgreSQL (pgvector).
  *
- *   ask   "question" [--top N]  [--kb <chemin>]
+ *   ask   "question" [--top N] [--jeu <nom>]
  *     Pose une question à la knowledge base (+ LLM si clé API disponible).
  *
  *   analyse <fichier> [--embed] [--output <chemin>]
@@ -16,7 +16,7 @@
  *   ts-node src/index.ts add data/regles.txt
  *   ts-node src/index.ts ask "Comment se déroule un combat ?"
  *   ts-node src/index.ts ask "Quelles ressources existe-t-il ?" --top 5
- *   OPENAI_API_KEY=sk-... ts-node src/index.ts ask "Comment gagner ?"
+ *   MISTRAL_API_KEY=... ts-node src/index.ts ask "Comment gagner ?"
  */
 
 import 'dotenv/config';
@@ -29,17 +29,18 @@ ${chalk.bold.cyan('Analyseur de Règles de Jeu de Société')}
 
 ${chalk.bold('COMMANDES :')}
 
-  ${chalk.green('add')} <fichier.txt|pdf> [options]
-    Analyse et indexe un fichier de règles dans la base de connaissance.
+  ${chalk.green('add')} <fichier.txt|pdf> [--merge]
+    Analyse et indexe un fichier de règles dans PostgreSQL (pgvector).
+    Les embeddings denses (384 dims) sont générés automatiquement.
     Options :
-      --embed         Génère aussi un embedding dense (OpenAI ou TF-IDF)
-      --kb <chemin>   Chemin vers la KB (défaut : data/knowledge-base.json)
+      --merge   Ajoute les sections au jeu existant sans l'écraser
+                (utile pour indexer une extension ou un second PDF)
 
   ${chalk.green('ask')} "question" [options]
     Pose une question à la base de connaissance (RAG + LLM optionnel).
     Options :
       --top <N>       Nombre de sections à récupérer (défaut : 4)
-      --kb <chemin>   Chemin vers la KB (défaut : data/knowledge-base.json)
+      --jeu <nom>     Cibler un jeu spécifique par son nom
 
   ${chalk.green('analyse')} <fichier.txt|pdf> [options]
     Analyse standalone sans indexation (produit resultat.json).
@@ -49,15 +50,17 @@ ${chalk.bold('COMMANDES :')}
 
 ${chalk.bold('VARIABLES D\'ENVIRONNEMENT :')}
 
+  DATABASE_URL      Connexion PostgreSQL (défaut : postgresql://postgres@localhost:5432/ask_rules)
+  MISTRAL_API_KEY   Clé API Mistral (active l'assistant pour ask)
   OPENAI_API_KEY    Clé API OpenAI (active gpt-4o-mini pour ask)
   OLLAMA_MODEL      Nom du modèle Ollama local (ex: llama3, mistral)
   OLLAMA_HOST       URL Ollama (défaut : http://localhost:11434)
 
-${chalk.bold('EXEMPLES :')}
+${chalk.bold('DÉMARRAGE :')}
 
-  pnpm run add
+  pnpm run migrate   Initialise le schéma PostgreSQL (à faire une seule fois)
+  pnpm run add data/regles.txt
   pnpm run ask "Combien de joueurs peuvent jouer ?"
-  OPENAI_API_KEY=sk-... pnpm run ask "Comment fonctionne un combat ?"
 `;
 
 async function main(): Promise<void> {

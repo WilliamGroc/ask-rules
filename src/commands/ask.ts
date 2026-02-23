@@ -2,7 +2,7 @@
  * ask.ts — Commande : poser une question à la knowledge base / LLM
  *
  * Usage :
- *   ts-node src/index.ts ask "Combien de joueurs ?" [--top 4] [--kb <chemin>] [--jeu <nom>]
+ *   ts-node src/index.ts ask "Combien de joueurs ?" [--top 4] [--jeu <nom>]
  *
  * Exemples :
  *   ts-node src/index.ts ask "Comment fonctionne un combat ?"
@@ -11,9 +11,10 @@
  */
 
 import chalk from 'chalk';
-import { retrieveFromBestGame } from '../modules/retriever';
+import { retrieveFromBestGame, retrieveForGame } from '../modules/retriever';
 import { queryLLM } from '../modules/llmClient';
-import { loadKB, summarizeKB, KB_DEFAULT_PATH } from '../modules/knowledgeBase';
+import { summarizeKB, listGames } from '../modules/knowledgeBase';
+import pool from '../modules/db';
 import type { ScoredSection } from '../types';
 import type { GameSelection } from '../modules/retriever';
 
@@ -49,46 +50,18 @@ function printSections(results: ScoredSection[]): void {
   });
 }
 
-// ── Sélection manuelle du jeu (--jeu) ────────────────────────────────────────
-
-/**
- * Filtre la KB pour ne conserver que le jeu dont le nom contient la chaîne donnée
- * puis appelle retrieveFromBestGame sur cette KB réduite.
- */
-function retrieveForGame(
-  gameName: string,
-  question: string,
-  kb: ReturnType<typeof loadKB>,
-  topN: number,
-): GameSelection | null {
-  const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-  const needle = normalize(gameName);
-  const match  = kb.games.find(g => normalize(g.jeu).includes(needle));
-
-  if (!match) return null;
-
-  const reduced = { ...kb, games: [match] };
-  return retrieveFromBestGame(question, reduced, topN, 0.01);
-}
-
 // ── Commande principale ───────────────────────────────────────────────────────
 
 export async function runAsk(argv: string[]): Promise<void> {
-  // Parse des arguments
   const topFlag = argv.indexOf('--top');
-  const topN    = topFlag !== -1 ? parseInt(argv[topFlag + 1] ?? '4', 10) : 4;
-
-  const kbFlag  = argv.indexOf('--kb');
-  const kbPath  = kbFlag !== -1 ? argv[kbFlag + 1] : KB_DEFAULT_PATH;
+  const topN = topFlag !== -1 ? parseInt(argv[topFlag + 1] ?? '4', 10) : 4;
 
   const jeuFlag = argv.indexOf('--jeu');
   const jeuFilter = jeuFlag !== -1 ? argv[jeuFlag + 1] : null;
 
   // La question = args qui ne sont pas des flags ni leurs valeurs
   const flagsWithValues = new Set<number>();
-  ['--top', '--kb', '--jeu'].forEach(f => {
+  ['--top', '--jeu'].forEach(f => {
     const idx = argv.indexOf(f);
     if (idx !== -1) { flagsWithValues.add(idx); flagsWithValues.add(idx + 1); }
   });
@@ -109,36 +82,38 @@ export async function runAsk(argv: string[]): Promise<void> {
   console.log(chalk.bold.cyan('══════════════════════════════════════════════════════\n'));
   console.log(chalk.bold('❓ Question : ') + question + '\n');
 
-  // ── Chargement de la KB ─────────────────────────────────────────────────────
-  const kb = loadKB(kbPath);
+  // ── Résumé de la base ────────────────────────────────────────────────────────
+  const summary = await summarizeKB();
+  console.log(chalk.gray(`🗄️  Base KB : ${summary}\n`));
 
-  if (kb.games.length === 0) {
+  if (summary.startsWith('0 jeu')) {
     console.error(chalk.red('✖  La base de connaissance est vide.'));
     console.error(chalk.gray('   Ajoutez d\'abord un fichier : ts-node src/index.ts add <fichier>'));
+    await pool.end();
     process.exit(1);
   }
 
-  console.log(chalk.gray(`🗄️  Base KB : ${summarizeKB(kb)} (${kbPath})\n`));
-
-  // ── Récupération sémantique + sélection du jeu ──────────────────────────────
-  console.log(chalk.yellow(`🔍 Sélection du jeu pertinent et recherche des ${topN} sections…`));
+  // ── Récupération sémantique ──────────────────────────────────────────────────
+  console.log(chalk.yellow(`🔍 Recherche des ${topN} sections les plus pertinentes…`));
 
   let selection: GameSelection | null;
 
   if (jeuFilter) {
-    // Sélection manuelle via --jeu
-    selection = retrieveForGame(jeuFilter, question, kb, topN);
+    selection = await retrieveForGame(question, jeuFilter, topN);
     if (!selection) {
-      console.error(chalk.red(`✖  Aucun jeu correspondant à "${jeuFilter}" dans la KB.`));
-      console.error(chalk.gray('   Jeux disponibles : ' + kb.games.map(g => g.jeu).join(', ')));
+      const games = await listGames();
+      console.error(chalk.red(`✖  Aucun jeu correspondant à "${jeuFilter}" dans la base.`));
+      console.error(chalk.gray('   Jeux disponibles : ' + games.map(g => g.jeu).join(', ')));
+      await pool.end();
       process.exit(1);
     }
     console.log(chalk.blue(`🎲 Jeu ciblé (--jeu) : ${chalk.bold(selection.jeu)}\n`));
   } else {
-    selection = retrieveFromBestGame(question, kb, topN);
+    selection = await retrieveFromBestGame(question, topN);
     if (!selection) {
       console.log(chalk.red('\n  Aucune section pertinente trouvée pour cette question.'));
-      console.log(chalk.gray('  Essayez des mots-clés différents ou précisez avec --jeu.<nom_du_jeu>\n'));
+      console.log(chalk.gray('  Essayez des mots-clés différents ou précisez avec --jeu <nom_du_jeu>\n'));
+      await pool.end();
       return;
     }
 
@@ -152,6 +127,7 @@ export async function runAsk(argv: string[]): Promise<void> {
   if (selection.sections.length === 0) {
     console.log(chalk.red('\n  Aucune section pertinente trouvée dans ce jeu.'));
     console.log(chalk.gray('  Essayez des mots-clés différents ou --jeu <autre_jeu>.\n'));
+    await pool.end();
     return;
   }
 
@@ -170,6 +146,7 @@ export async function runAsk(argv: string[]): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(chalk.red(`\n✖  Erreur LLM : ${msg}`));
+    await pool.end();
     process.exit(1);
   }
 
@@ -191,4 +168,5 @@ export async function runAsk(argv: string[]): Promise<void> {
   }
 
   console.log('');
+  await pool.end();
 }

@@ -1,13 +1,12 @@
 /**
- * add.ts — Commande : indexation d'un fichier de règles dans la knowledge base
+ * add.ts — Commande : indexation d'un fichier de règles dans la knowledge base (PostgreSQL)
  *
  * Usage :
- *   ts-node src/index.ts add <fichier.txt|pdf> [--embed] [--kb <chemin>]
+ *   tsx src/index.ts add <fichier.txt|pdf> [--merge]
  *
  * Exemples :
- *   ts-node src/index.ts add data/regles.txt
- *   ts-node src/index.ts add data/regles.pdf --embed
- *   ts-node src/index.ts add data/autre_jeu.txt --kb data/ma-base.json
+ *   tsx src/index.ts add data/regles.txt
+ *   tsx src/index.ts add data/extension.pdf --merge   → ajoute au jeu existant
  */
 
 import fs from 'fs';
@@ -15,20 +14,18 @@ import path from 'path';
 import chalk from 'chalk';
 
 import { analyseFile } from '../pipeline';
-import { buildVector } from '../modules/retriever';
-import { loadKB, saveKB, upsertEntry, slugify, summarizeKB, KB_DEFAULT_PATH }
-  from '../modules/knowledgeBase';
+import { generateEmbedding } from '../modules/embedder';
+import { upsertGame, gameExists, mergeGame, countSections, slugify, summarizeKB } from '../modules/knowledgeBase';
+import pool from '../modules/db';
 import type { KnowledgeBaseEntry, StoredSection } from '../types';
 
 export async function runAdd(argv: string[]): Promise<void> {
   const filePath = argv.find(a => !a.startsWith('--'));
-  const withEmbed = argv.includes('--embed');
-  const kbFlag = argv.indexOf('--kb');
-  const kbPath = kbFlag !== -1 ? argv[kbFlag + 1] : KB_DEFAULT_PATH;
+  const mergeFlag = argv.includes('--merge');
 
   if (!filePath) {
     console.error(chalk.red('✖  Erreur : chemin du fichier manquant.'));
-    console.error(chalk.gray('   Usage : ts-node src/index.ts add <fichier.txt|pdf> [--embed] [--kb chemin.json]'));
+    console.error(chalk.gray('   Usage : tsx src/index.ts add <fichier.txt|pdf> [--merge]'));
     process.exit(1);
   }
   if (!fs.existsSync(filePath)) {
@@ -40,17 +37,16 @@ export async function runAdd(argv: string[]): Promise<void> {
   const startTime = Date.now();
 
   console.log(chalk.bold.cyan('\n══════════════════════════════════════════════════════'));
-  console.log(chalk.bold.cyan('   Indexation dans la Knowledge Base                  '));
+  console.log(chalk.bold.cyan('   Indexation dans la Knowledge Base (PostgreSQL)      '));
   console.log(chalk.bold.cyan('══════════════════════════════════════════════════════\n'));
-  console.log(chalk.blue(`📄 Fichier : ${filePath}`));
-  console.log(chalk.blue(`💾 Base KB : ${kbPath}\n`));
+  console.log(chalk.blue(`📄 Fichier : ${filePath}\n`));
 
-  // ── Étape 1 : Analyse du fichier ────────────────────────────────────────────
+  // ── Étape 1 : Analyse NLP ────────────────────────────────────────────────────
   console.log(chalk.yellow('▶ Étape 1/3 — Analyse NLP…'));
   let sectionsDone = 0;
 
   const result = await analyseFile(absPath, {
-    withEmbed,
+    withEmbed: false,
     onSection: (_i, total, titre) => {
       sectionsDone++;
       process.stdout.write(chalk.gray(`   ${sectionsDone}/${total} "${titre}"…\r`));
@@ -60,23 +56,40 @@ export async function runAdd(argv: string[]): Promise<void> {
   process.stdout.write(' '.repeat(80) + '\r');
   console.log(chalk.green(`   ✔ "${result.jeu}" — ${result.statistiques.sections} section(s)\n`));
 
-  // ── Étape 2 : Vectorisation TF-IDF ──────────────────────────────────────────
-  console.log(chalk.yellow('▶ Étape 2/3 — Vectorisation TF-IDF des sections…'));
+  // ── Étape 2 : Génération des embeddings ──────────────────────────────────────
+  console.log(chalk.yellow('▶ Étape 2/3 — Génération des embeddings (384 dims)…'));
 
   const gameSlug = slugify(result.jeu);
-  const storedSections: StoredSection[] = result.sections.map((section, i) => ({
-    ...section,
-    section_id: `${gameSlug}_${i}`,
-    tfidf_vector: buildVector(section.contenu),
-  }));
+  const alreadyExists = await gameExists(gameSlug);
 
-  console.log(chalk.green(`   ✔ ${storedSections.length} vecteur(s) calculé(s)\n`));
+  // En mode fusion, on décale les IDs pour éviter les collisions avec les sections existantes
+  const isMerge = mergeFlag && alreadyExists;
+  const idOffset = isMerge ? await countSections(gameSlug) : 0;
 
-  // ── Étape 3 : Sauvegarde dans la KB ─────────────────────────────────────────
-  console.log(chalk.yellow('▶ Étape 3/3 — Mise à jour de la base de connaissance…'));
+  if (mergeFlag && !alreadyExists) {
+    console.log(chalk.gray(`   (--merge ignoré : "${result.jeu}" n'existe pas encore, ajout normal)\n`));
+  }
 
-  const kb = loadKB(kbPath);
-  const isUpdate = kb.games.some(g => g.id === gameSlug);
+  const storedSections: StoredSection[] = [];
+
+  for (let i = 0; i < result.sections.length; i++) {
+    const section = result.sections[i];
+    process.stdout.write(chalk.gray(`   ${i + 1}/${result.sections.length} "${section.titre}"…\r`));
+
+    const embedding = await generateEmbedding(section.contenu);
+
+    storedSections.push({
+      ...section,
+      section_id: `${gameSlug}_${idOffset + i}`,
+      embedding,
+    });
+  }
+
+  process.stdout.write(' '.repeat(80) + '\r');
+  console.log(chalk.green(`   ✔ ${storedSections.length} embedding(s) généré(s)\n`));
+
+  // ── Étape 3 : Sauvegarde PostgreSQL ──────────────────────────────────────────
+  console.log(chalk.yellow('▶ Étape 3/3 — Sauvegarde en base de données…'));
 
   const entry: KnowledgeBaseEntry = {
     id: gameSlug,
@@ -88,18 +101,28 @@ export async function runAdd(argv: string[]): Promise<void> {
     sections: storedSections,
   };
 
-  upsertEntry(kb, entry);
-  saveKB(kb, kbPath);
+  if (isMerge) {
+    await mergeGame(entry);
+  } else {
+    await upsertGame(entry);
+  }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
 
-  console.log(chalk.green(`   ✔ ${isUpdate ? 'Mis à jour' : 'Ajouté'} : "${result.jeu}"\n`));
+  const actionLabel = isMerge
+    ? `Fusionné (+${storedSections.length} sections) : "${result.jeu}"`
+    : alreadyExists
+      ? `Remplacé : "${result.jeu}"`
+      : `Ajouté : "${result.jeu}"`;
+
+  console.log(chalk.green(`   ✔ ${actionLabel}\n`));
   console.log(chalk.bold.green('══════════════════════════════════════════════════════'));
   console.log(chalk.bold.green(`   Indexation terminée en ${elapsed}s`));
   console.log(chalk.bold.green('══════════════════════════════════════════════════════\n'));
-  console.log(chalk.bold('État de la base :') + ' ' + summarizeKB(kb));
 
-  // Résumé des mécaniques détectées
+  const summary = await summarizeKB();
+  console.log(chalk.bold('État de la base :') + ' ' + summary);
+
   const mecas = result.statistiques.mecaniques_detectees;
   if (mecas.length > 0) {
     console.log(chalk.gray('Mécaniques     : ') + mecas.join(', '));
@@ -109,4 +132,6 @@ export async function runAdd(argv: string[]): Promise<void> {
     console.log(chalk.gray('Joueurs        : ') + `${meta.joueurs_min}–${meta.joueurs_max}`);
   }
   console.log('');
+
+  await pool.end();
 }

@@ -16,14 +16,45 @@ function extractFromText(filePath: string): string {
 
 /**
  * Lit un fichier PDF et retourne le texte extrait.
- * pdf-parse est chargé dynamiquement pour éviter son effet de bord
- * au require (il tente de lire un fichier de test au chargement).
+ * Chaque page est précédée d'un marqueur %%PAGE:N%% pour que le parseur
+ * de sections puisse associer chaque section à son numéro de page.
+ * pdf-parse est importé dynamiquement pour éviter son effet de bord
+ * au chargement (il tente de lire un fichier de test).
  */
 async function extractFromPdf(filePath: string): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
+  // Dynamic import keeps pdf-parse lazy (avoids its load-time side effect of
+  // reading a test file). The default export is the parse function in ESM.
+  const { default: pdfParse } = await import('pdf-parse') as {
+    default: (
+      buffer: Buffer,
+      options?: { pagerender?: (pageData: any) => Promise<string> },
+    ) => Promise<{ text: string }>;
+  };
+
   const buffer = fs.readFileSync(filePath);
-  const data = await pdfParse(buffer);
+
+  let pageNum = 0;
+
+  // Réplique le rendu par défaut de pdf-parse en ajoutant un marqueur de page.
+  const pagerender = async (pageData: any): Promise<string> => {
+    pageNum++;
+    const textContent: { items: Array<{ str: string; transform: number[] }> } =
+      await pageData.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false });
+
+    let lastY: number | undefined;
+    let text = '';
+    for (const item of textContent.items) {
+      if (lastY === item.transform[5] || lastY === undefined) {
+        text += item.str;
+      } else {
+        text += '\n' + item.str;
+      }
+      lastY = item.transform[5];
+    }
+    return `%%PAGE:${pageNum}%%\n${text}\n`;
+  };
+
+  const data = await pdfParse(buffer, { pagerender });
   return data.text;
 }
 

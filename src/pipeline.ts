@@ -58,6 +58,8 @@ export async function analyseFile(
       actions: nlpResult.actions,
       resume: nlpResult.resume,
       mecaniques,
+      page_debut: section.page_debut,
+      page_fin: section.page_fin,
     };
 
     if (withEmbed) {

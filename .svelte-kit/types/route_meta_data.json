@@ -1,0 +1,8 @@
+{
+	"/": [
+		"src/routes/+page.server.ts"
+	],
+	"/import": [
+		"src/routes/import/+page.server.ts"
+	]
+}
