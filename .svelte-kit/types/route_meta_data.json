@@ -4,5 +4,8 @@
 	],
 	"/import": [
 		"src/routes/import/+page.server.ts"
+	],
+	"/import/stream": [
+		"src/routes/import/stream/+server.ts"
 	]
 }

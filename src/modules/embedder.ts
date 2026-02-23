@@ -21,10 +21,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   let pipeline: any;
 
   try {
-    // require() dynamique : ne plante pas à la compilation si le package est absent.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const transformers = require('@xenova/transformers');
-    pipeline = transformers.pipeline;
+    // import() dynamique : compatible ESM (Vite SSR) et CLI tsx.
+    // @xenova/transformers expose pipeline comme export nommé (ESM)
+    // ou sous .default (interop CJS) selon l'environnement.
+    const mod = await import('@xenova/transformers');
+    pipeline = (mod as any).pipeline ?? (mod as any).default?.pipeline;
   } catch {
     throw new Error(
       'La bibliothèque "@xenova/transformers" n\'est pas installée.\n' +

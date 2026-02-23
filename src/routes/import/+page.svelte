@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
-  import type { PageData, ActionData } from './$types';
+  import type { PageData } from './$types';
 
   export let data: PageData;
-  export let form: ActionData;
 
+  // ── État du formulaire ──────────────────────────────────────────────────────
   let isLoading = false;
   let selectedGame = '';
   let gameNameValue = '';
+  let importMode: 'file' | 'url' = 'file';
 
   function onGameSelect(e: Event) {
     const select = e.target as HTMLSelectElement;
@@ -16,6 +16,76 @@
       const game = data.games.find((g) => g.id === selectedGame);
       if (game) gameNameValue = game.jeu;
     }
+  }
+
+  // ── État de la progression ──────────────────────────────────────────────────
+  type Step = { message: string };
+  type EmbeddingState = { current: number; total: number };
+  type SuccessResult = { ok: true; jeu: string; sections: number; action: string; mecaniques: string[] };
+  type ErrorResult   = { ok: false; error: string };
+
+  let steps: Step[] = [];
+  let embedding: EmbeddingState | null = null;
+  let result: SuccessResult | ErrorResult | null = null;
+
+  // ── Soumission avec affichage en temps réel ─────────────────────────────────
+  async function handleSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    isLoading = true;
+    steps     = [];
+    embedding = null;
+    result    = null;
+
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch('/import/stream', { method: 'POST', body: formData });
+
+      if (!response.body) throw new Error(`Erreur serveur (${response.status})`);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let evt: Record<string, unknown>;
+          try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (evt.type === 'step') {
+            steps = [...steps, { message: evt.message as string }];
+          } else if (evt.type === 'embedding_start') {
+            embedding = { current: 0, total: evt.total as number };
+          } else if (evt.type === 'embedding_progress') {
+            embedding = { current: evt.current as number, total: evt.total as number };
+          } else if (evt.type === 'done') {
+            embedding = null;
+            result = {
+              ok: true,
+              jeu:       evt.jeu      as string,
+              sections:  evt.sections  as number,
+              action:    evt.action    as string,
+              mecaniques: evt.mecaniques as string[],
+            };
+          } else if (evt.type === 'error') {
+            result = { ok: false, error: evt.message as string };
+          }
+        }
+      }
+    } catch (err) {
+      result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+
+    isLoading = false;
   }
 </script>
 
@@ -41,13 +111,7 @@
     method="POST"
     enctype="multipart/form-data"
     class="import-form"
-    use:enhance={() => {
-      isLoading = true;
-      return async ({ update }) => {
-        await update();
-        isLoading = false;
-      };
-    }}
+    on:submit={handleSubmit}
   >
     <!-- Nom du jeu -->
     <div class="form-group">
@@ -122,29 +186,56 @@
           </div>
         </div>
       {:else}
-        <!-- Valeur cachée par défaut -->
         <input type="hidden" name="mode" value="replace" />
       {/if}
     {:else}
       <input type="hidden" name="mode" value="replace" />
     {/if}
 
-    <!-- Fichier -->
+    <!-- Source : onglets Fichier / URL -->
     <div class="form-group">
-      <label class="form-label" for="fichier"
-        >Fichier de règles <span class="required">*</span></label
-      >
-      <div class="file-input-wrapper">
-        <input
-          id="fichier"
-          name="fichier"
-          type="file"
-          accept=".txt,.pdf"
+      <span class="form-label">Source <span class="required">*</span></span>
+
+      <div class="import-tabs" role="group" aria-label="Mode d'import">
+        <button
+          type="button"
+          class="import-tab{importMode === 'file' ? ' active' : ''}"
           disabled={isLoading}
-          class="file-input"
-        />
-        <span class="file-hint">.txt ou .pdf</span>
+          on:click={() => (importMode = 'file')}
+        >Fichier</button>
+        <button
+          type="button"
+          class="import-tab{importMode === 'url' ? ' active' : ''}"
+          disabled={isLoading}
+          on:click={() => (importMode = 'url')}
+        >URL</button>
       </div>
+
+      <input type="hidden" name="importMode" value={importMode} />
+
+      {#if importMode === 'file'}
+        <div class="file-input-wrapper">
+          <input
+            id="fichier"
+            name="fichier"
+            type="file"
+            accept=".txt,.pdf"
+            disabled={isLoading}
+            class="file-input"
+          />
+          <span class="file-hint">.txt ou .pdf</span>
+        </div>
+      {:else}
+        <input
+          id="url"
+          name="url"
+          type="url"
+          class="text-input"
+          placeholder="https://exemple.com/regles.pdf  ou  https://exemple.com/faq"
+          disabled={isLoading}
+        />
+        <span class="form-hint">PDF, page HTML (FAQ) ou fichier texte brut</span>
+      {/if}
     </div>
 
     <!-- Bouton -->
@@ -163,47 +254,77 @@
     </div>
   </form>
 
-  <!-- Résultat -->
-  {#if form}
+  <!-- Progression + résultat -->
+  {#if isLoading || result || steps.length > 0}
     <section class="result-section" aria-live="polite">
-      {#if !form.ok}
-        <div class="error-card" role="alert">
-          <span class="error-icon">⚠</span>
-          {form.error}
+
+      <!-- Étapes terminées -->
+      {#if steps.length > 0}
+        <div class="progress-steps">
+          {#each steps as step}
+            <div class="progress-step">
+              <span class="progress-step-icon" aria-hidden="true">✔</span>
+              <span>{step.message}</span>
+            </div>
+          {/each}
         </div>
-      {:else}
-        <div class="success-card">
-          <div class="success-header">
-            <span class="success-icon">✔</span>
-            <span>Indexation terminée</span>
+      {/if}
+
+      <!-- Barre de progression des embeddings -->
+      {#if embedding}
+        <div class="progress-bar-wrapper">
+          <div class="progress-bar-label">
+            <span>Génération des embeddings</span>
+            <span class="progress-bar-count">{embedding.current} / {embedding.total}</span>
           </div>
-          <div class="success-body">
-            <div class="success-row">
-              <span class="success-key">Jeu</span>
-              <span class="success-val">{form.jeu}</span>
-            </div>
-            <div class="success-row">
-              <span class="success-key">Sections</span>
-              <span class="success-val"
-                >{form.sections} section{form.sections > 1 ? 's' : ''} indexée{form.sections >
-                1
-                  ? 's'
-                  : ''}</span
-              >
-            </div>
-            <div class="success-row">
-              <span class="success-key">Action</span>
-              <span class="success-val success-action">{form.action}</span>
-            </div>
-            {#if form.mecaniques && form.mecaniques.length > 0}
-              <div class="success-row">
-                <span class="success-key">Mécaniques</span>
-                <span class="success-val">{form.mecaniques.join(', ')}</span>
-              </div>
-            {/if}
+          <div class="progress-bar-track" role="progressbar" aria-valuenow={embedding.current} aria-valuemax={embedding.total}>
+            <div
+              class="progress-bar-fill"
+              style="width: {embedding.total > 0 ? (embedding.current / embedding.total) * 100 : 0}%"
+            ></div>
           </div>
         </div>
       {/if}
+
+      <!-- Résultat final -->
+      {#if result}
+        {#if !result.ok}
+          <div class="error-card" role="alert">
+            <span class="error-icon">⚠</span>
+            {result.error}
+          </div>
+        {:else}
+          <div class="success-card">
+            <div class="success-header">
+              <span class="success-icon">✔</span>
+              <span>Indexation terminée</span>
+            </div>
+            <div class="success-body">
+              <div class="success-row">
+                <span class="success-key">Jeu</span>
+                <span class="success-val">{result.jeu}</span>
+              </div>
+              <div class="success-row">
+                <span class="success-key">Sections</span>
+                <span class="success-val"
+                  >{result.sections} section{result.sections > 1 ? 's' : ''} indexée{result.sections > 1 ? 's' : ''}</span
+                >
+              </div>
+              <div class="success-row">
+                <span class="success-key">Action</span>
+                <span class="success-val success-action">{result.action}</span>
+              </div>
+              {#if result.mecaniques && result.mecaniques.length > 0}
+                <div class="success-row">
+                  <span class="success-key">Mécaniques</span>
+                  <span class="success-val">{result.mecaniques.join(', ')}</span>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
+      {/if}
+
     </section>
   {/if}
 
