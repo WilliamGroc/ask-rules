@@ -33,6 +33,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     );
   }
 
+  // @xenova/transformers v2 n'utilise pas XDG_CACHE_HOME nativement.
+  // On lit la variable manuellement pour pointer vers le cache Docker (/hf-cache).
+  const cacheDir = process.env.XDG_CACHE_HOME;
+  if (cacheDir) {
+    (mod as any).env.cacheDir = cacheDir;
+  }
+
   const extractor = await pipeline(
     'feature-extraction',
     'Xenova/paraphrase-multilingual-MiniLM-L12-v2',

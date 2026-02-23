@@ -24,13 +24,13 @@ COPY . .
 
 RUN pnpm run build:web
 
-# Pré-télécharge le modèle d'embedding (Xenova/paraphrase-multilingual-MiniLM-L12-v2, ~50 MB)
-# dans /root/.cache/huggingface afin d'éviter tout téléchargement au démarrage du conteneur.
-RUN node --input-type=module <<'SCRIPT'
-import { pipeline } from '@xenova/transformers';
-await pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2');
-console.log('[docker] Modèle pré-téléchargé.');
-SCRIPT
+# Force le cache Xenova dans /hf-cache pour que le chemin soit prévisible.
+# @xenova/transformers v2 n'utilise pas XDG_CACHE_HOME — on doit passer par
+# env.cacheDir (API JS). XDG_CACHE_HOME est relu dans embedder.ts au runtime.
+ENV XDG_CACHE_HOME=/hf-cache
+RUN printf 'import { env, pipeline } from "@xenova/transformers";\nenv.cacheDir = "/hf-cache";\nawait pipeline("feature-extraction", "Xenova/paraphrase-multilingual-MiniLM-L12-v2");\nconsole.log("[docker] Modele pre-telecharge dans /hf-cache.");\n' \
+    | node --input-type=module \
+ && ls /hf-cache
 
 # ── Stage 3 : Runtime production (image allégée, sans devDeps) ───────────────
 FROM node:24-slim AS runtime
@@ -38,6 +38,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# Même chemin de cache qu'au build → le modèle est trouvé sans téléchargement
+ENV XDG_CACHE_HOME=/hf-cache
 
 # Variables d'environnement à fournir au lancement du conteneur :
 #   DATABASE_URL       — URL PostgreSQL (ex: postgres://user:pass@host:5432/db)
@@ -54,7 +56,7 @@ RUN pnpm install --frozen-lockfile --prod
 COPY --from=builder /app/build ./build
 
 # Modèle d'embedding pré-téléchargé (pas de connexion réseau requise au runtime)
-COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
+COPY --from=builder /hf-cache /hf-cache
 
 EXPOSE 3000
 CMD ["node", "build/index.js"]
