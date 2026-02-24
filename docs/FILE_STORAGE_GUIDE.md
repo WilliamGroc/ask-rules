@@ -333,21 +333,23 @@ if (missing.length > 0) {
 
 Par défaut : `uploads/` à la racine du projet.
 
-Pour changer, modifier [fileStorage.ts](src/modules/fileStorage.ts) :
-
-```typescript
-// Avant
-const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
-
-// Après (exemple: /var/data/ask-rules)
-const UPLOADS_DIR =
-  process.env.UPLOADS_DIR ?? path.resolve(process.cwd(), "uploads");
-```
-
-Puis dans `.env` :
+Pour changer, définir la variable d'environnement `UPLOADS_DIR` dans votre fichier `.env` :
 
 ```bash
-UPLOADS_DIR=/var/data/ask-rules
+# .env
+UPLOADS_DIR=/var/data/ask-rules/uploads
+```
+
+Le répertoire sera créé automatiquement s'il n'existe pas. Si la variable n'est pas définie, le répertoire `uploads/` à la racine du projet sera utilisé.
+
+**Exemple pour un déploiement en production** :
+
+```bash
+# Utiliser un volume Docker monté
+UPLOADS_DIR=/mnt/storage/uploads
+
+# Ou un répertoire système dédié
+UPLOADS_DIR=/var/lib/ask-rules/uploads
 ```
 
 ### Organisation Alternative par Date

@@ -14,7 +14,9 @@ import path from 'path';
 import { slugify } from './knowledgeBase';
 
 /** Répertoire racine pour tous les uploads */
-const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+const UPLOADS_DIR = path.resolve(
+  process.env.UPLOADS_DIR ?? path.join(process.cwd(), 'uploads')
+);
 
 /**
  * Initialise le répertoire uploads s'il n'existe pas.
