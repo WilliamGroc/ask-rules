@@ -170,6 +170,85 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
   }
 }
 
+// ── Écriture en flux ──────────────────────────────────────────────────────────
+
+/**
+ * Ouvre une transaction d'insertion en flux.
+ *
+ * Au lieu d'accumuler toutes les sections + embeddings en mémoire avant de
+ * commiter, ce writer maintient une connexion ouverte et insère chaque section
+ * dès qu'elle est prête. La RAM nécessaire est proportionnelle à une seule
+ * section + embedding à la fois, pas à l'ensemble du document.
+ *
+ * Usage :
+ *   const writer = await openSectionWriter(gameId, meta, isMerge);
+ *   try {
+ *     for (const s of sections) { await writer.insertSection(s); }
+ *     await writer.commit();
+ *   } catch { await writer.rollback(); throw; }
+ */
+export async function openSectionWriter(
+  gameId: string,
+  meta: Pick<KnowledgeBaseEntry, 'jeu' | 'fichier' | 'date_ajout' | 'metadata' | 'statistiques'>,
+  isMerge: boolean,
+): Promise<{
+  insertSection(section: StoredSection): Promise<void>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}> {
+  const client = await pool.connect();
+  await client.query('BEGIN');
+
+  if (isMerge) {
+    await client.query(
+      `UPDATE games SET fichier = fichier || ' + ' || $1 WHERE id = $2`,
+      [meta.fichier, gameId],
+    );
+  } else {
+    await client.query(
+      `INSERT INTO games (id, jeu, fichier, date_ajout, metadata, statistiques)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE SET
+         jeu          = EXCLUDED.jeu,
+         fichier      = EXCLUDED.fichier,
+         metadata     = EXCLUDED.metadata,
+         statistiques = EXCLUDED.statistiques`,
+      [gameId, meta.jeu, meta.fichier, meta.date_ajout,
+        JSON.stringify(meta.metadata), JSON.stringify(meta.statistiques)],
+    );
+    await client.query('DELETE FROM sections WHERE game_id = $1', [gameId]);
+  }
+
+  return {
+    async insertSection(section: StoredSection) {
+      const embedding = section.embedding && section.embedding.length > 0
+        ? toVectorLiteral(section.embedding as number[])
+        : null;
+      await client.query(
+        `INSERT INTO sections
+           (id, game_id, titre, niveau, type_section, contenu,
+            entites, actions, resume, mecaniques, embedding,
+            page_debut, page_fin)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [
+          section.section_id, gameId,
+          section.titre, section.niveau, section.type_section, section.contenu,
+          section.entites, section.actions, section.resume, section.mecaniques,
+          embedding, section.page_debut ?? null, section.page_fin ?? null,
+        ],
+      );
+    },
+    async commit() {
+      await client.query('COMMIT');
+      client.release();
+    },
+    async rollback() {
+      await client.query('ROLLBACK');
+      client.release();
+    },
+  };
+}
+
 /** Trouve un jeu par son identifiant ou son chemin de fichier. */
 export async function findGame(idOrPath: string): Promise<KnowledgeBaseEntry | null> {
   const res = await pool.query(

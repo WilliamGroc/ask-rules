@@ -11,10 +11,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fail } from '@sveltejs/kit';
-import { listGames, upsertGame, mergeGame, gameExists, countSections, slugify } from '../../modules/knowledgeBase';
+import { listGames, openSectionWriter, gameExists, countSections, slugify } from '../../modules/knowledgeBase';
 import { generateEmbedding } from '../../modules/embedder';
 import { analyseFile } from '../../pipeline';
-import type { KnowledgeBaseEntry, StoredSection } from '../../types';
 import type { Actions, PageServerLoad } from './$types';
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -61,33 +60,34 @@ export const actions: Actions = {
       const isMerge = mode === 'merge' && alreadyExists;
       const idOffset = isMerge ? await countSections(gameSlug) : 0;
 
-      // ── Génération des embeddings ─────────────────────────────────────────
-      const storedSections: StoredSection[] = [];
-      for (let i = 0; i < result.sections.length; i++) {
-        const section = result.sections[i];
-        const embedding = await generateEmbedding(section.contenu);
-        storedSections.push({
-          ...section,
-          section_id: `${gameSlug}_${idOffset + i}`,
-          embedding,
-        });
-      }
+      // ── Génération des embeddings + sauvegarde en flux ──────────────────
+      const writer = await openSectionWriter(
+        gameSlug,
+        {
+          jeu: gameName,
+          fichier: fichier.name,
+          date_ajout: new Date().toISOString(),
+          metadata: result.metadata,
+          statistiques: result.statistiques,
+        },
+        isMerge,
+      );
 
-      // ── Sauvegarde PostgreSQL ─────────────────────────────────────────────
-      const entry: KnowledgeBaseEntry = {
-        id: gameSlug,
-        jeu: gameName,
-        fichier: fichier.name,
-        date_ajout: new Date().toISOString(),
-        metadata: result.metadata,
-        statistiques: result.statistiques,
-        sections: storedSections,
-      };
-
-      if (isMerge) {
-        await mergeGame(entry);
-      } else {
-        await upsertGame(entry);
+      let insertedCount = 0;
+      try {
+        for (let i = 0; i < result.sections.length; i++) {
+          const embedding = await generateEmbedding(result.sections[i].contenu);
+          await writer.insertSection({
+            ...result.sections[i],
+            section_id: `${gameSlug}_${idOffset + i}`,
+            embedding,
+          });
+          insertedCount++;
+        }
+        await writer.commit();
+      } catch (err) {
+        await writer.rollback();
+        throw err;
       }
 
       const actionLabel = isMerge
@@ -99,7 +99,7 @@ export const actions: Actions = {
       return {
         ok: true as const,
         jeu: gameName,
-        sections: storedSections.length,
+        sections: insertedCount,
         action: actionLabel,
         mecaniques: result.statistiques.mecaniques_detectees,
       };

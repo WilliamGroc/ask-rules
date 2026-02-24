@@ -25,10 +25,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import type { RequestHandler } from './$types';
-import { upsertGame, mergeGame, gameExists, countSections, slugify } from '../../../modules/knowledgeBase';
+import { openSectionWriter, gameExists, countSections, slugify } from '../../../modules/knowledgeBase';
 import { generateEmbedding } from '../../../modules/embedder';
 import { analyseFile } from '../../../pipeline';
-import type { KnowledgeBaseEntry, StoredSection } from '../../../types';
 
 // ── Helpers URL ───────────────────────────────────────────────────────────────
 
@@ -122,9 +121,9 @@ export const POST: RequestHandler = async ({ request }) => {
 
       try {
         const formData = await request.formData();
-        const gameName   = String(formData.get('gameName')   ?? '').trim();
-        const mode       = String(formData.get('mode')       ?? 'replace') as 'replace' | 'merge';
-        const importMode = String(formData.get('importMode') ?? 'file')    as 'file' | 'url';
+        const gameName = String(formData.get('gameName') ?? '').trim();
+        const mode = String(formData.get('mode') ?? 'replace') as 'replace' | 'merge';
+        const importMode = String(formData.get('importMode') ?? 'file') as 'file' | 'url';
 
         // ── Validation commune ────────────────────────────────────────────────
         if (!gameName) {
@@ -184,37 +183,39 @@ export const POST: RequestHandler = async ({ request }) => {
         const isMerge = mode === 'merge' && alreadyExists;
         const idOffset = isMerge ? await countSections(gameSlug) : 0;
 
-        // ── Embeddings ────────────────────────────────────────────────────────
+        // ── Embeddings + sauvegarde en flux ───────────────────────────────────
+        // Chaque section est insérée en base dès que son embedding est prêt,
+        // évitant d'accumuler n embeddings × 384 floats en mémoire.
         send({ type: 'embedding_start', total: n });
 
-        const storedSections: StoredSection[] = [];
-        for (let i = 0; i < n; i++) {
-          send({ type: 'embedding_progress', current: i + 1, total: n });
-          const embedding = await generateEmbedding(result.sections[i].contenu);
-          storedSections.push({
-            ...result.sections[i],
-            section_id: `${gameSlug}_${idOffset + i}`,
-            embedding,
-          });
-        }
+        const writer = await openSectionWriter(
+          gameSlug,
+          {
+            jeu: gameName,
+            fichier: sourceFilename,
+            date_ajout: new Date().toISOString(),
+            metadata: result.metadata,
+            statistiques: result.statistiques,
+          },
+          isMerge,
+        );
 
-        // ── Sauvegarde ────────────────────────────────────────────────────────
-        send({ type: 'step', message: 'Sauvegarde en base de données…' });
-
-        const entry: KnowledgeBaseEntry = {
-          id: gameSlug,
-          jeu: gameName,
-          fichier: sourceFilename,
-          date_ajout: new Date().toISOString(),
-          metadata: result.metadata,
-          statistiques: result.statistiques,
-          sections: storedSections,
-        };
-
-        if (isMerge) {
-          await mergeGame(entry);
-        } else {
-          await upsertGame(entry);
+        let insertedCount = 0;
+        try {
+          for (let i = 0; i < n; i++) {
+            send({ type: 'embedding_progress', current: i + 1, total: n });
+            const embedding = await generateEmbedding(result.sections[i].contenu);
+            await writer.insertSection({
+              ...result.sections[i],
+              section_id: `${gameSlug}_${idOffset + i}`,
+              embedding,
+            });
+            insertedCount++;
+          }
+          await writer.commit();
+        } catch (err) {
+          await writer.rollback();
+          throw err;
         }
 
         const actionLabel = isMerge ? 'fusionné' : alreadyExists ? 'remplacé' : 'ajouté';
@@ -222,7 +223,7 @@ export const POST: RequestHandler = async ({ request }) => {
         send({
           type: 'done',
           jeu: gameName,
-          sections: storedSections.length,
+          sections: insertedCount,
           action: actionLabel,
           mecaniques: result.statistiques.mecaniques_detectees,
         });
