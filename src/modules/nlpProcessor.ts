@@ -1,11 +1,13 @@
 /**
  * nlpProcessor.ts — Analyse NLP spécialisée pour le français et les jeux de société
  *
- * Utilise la librairie `natural` pour le français :
- *   - AggressiveTokenizerFr : tokenisation adaptée au français
- *   - PorterStemmerFr       : stemming (racines communes pour les variantes d'un mot)
+ * Tokenisation : CamemBERT (SentencePiece via @huggingface/transformers v3)
+ *   - Tokenizer français entraîné sur CamemBERT (camembert-base)
+ *   - Les sous-mots débutant par ▁ marquent le début d'un mot
+ *   - Les mots sont reconstruits en concaténant les sous-mots consécutifs
  *
  * Complété par :
+ *   - PorterStemmerFr (natural) : stemming pour regrouper les variantes
  *   - Un lexique de jeu de société (GAME_NOUNS)
  *   - La détection de verbes français (infinitifs + impératifs → infinitif lisible)
  *   - Un extracteur de mécaniques de jeu par correspondance de patterns
@@ -18,9 +20,76 @@ import natural from 'natural';
 import type { NlpResult, GameMechanic } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { AggressiveTokenizerFr, PorterStemmerFr } = natural as any;
+const { PorterStemmerFr } = natural as any;
 
-const tokenizerFr = new AggressiveTokenizerFr();
+// ── Tokenizer CamemBERT (lazy, singleton) ─────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _tokenizer: any = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getTokenizer(): Promise<any> {
+  if (_tokenizer) return _tokenizer;
+
+  // @huggingface/transformers v3 : successeur de @xenova/transformers v2.
+  // Contrairement à v2, v3 ne dépend pas d'un mock canvas en SSR/Node.js.
+  const mod = await import('@huggingface/transformers');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const AutoTokenizer = (mod as any).AutoTokenizer ?? (mod as any).default?.AutoTokenizer;
+
+  const cacheDir = process.env.XDG_CACHE_HOME;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (cacheDir) (mod as any).env.cacheDir = cacheDir;
+
+  _tokenizer = await AutoTokenizer.from_pretrained('camembert-base');
+  return _tokenizer;
+}
+
+/**
+ * Tokenise un texte via le tokenizer CamemBERT (SentencePiece).
+ * Reconstruit les mots entiers en décodant chaque ID individuellement :
+ *   - SentencePiece convertit ▁ en espace → un token décodé commençant par " "
+ *     marque le début d'un nouveau mot
+ *   - Un token sans espace initial est une continuation du mot courant
+ *
+ * On n'utilise ni convert_ids_to_tokens ni get_vocab (non exposés en v3).
+ */
+async function tokenizeToWords(text: string): Promise<string[]> {
+  const tokenizer = await getTokenizer();
+  const { input_ids } = tokenizer(text);
+
+  // input_ids.data peut être Int32Array ou BigInt64Array selon l'environnement
+  const ids: number[] = Array.from(input_ids.data as ArrayLike<number | bigint>).map(Number);
+
+  const words: string[] = [];
+  let current = '';
+
+  for (const id of ids) {
+    // skip_special_tokens: true → les tokens spéciaux (<s>, </s>…) décodent en ""
+    const decoded: string = tokenizer.decode([id], {
+      skip_special_tokens: true,
+      clean_up_tokenization_spaces: false,
+    });
+
+    if (!decoded) {
+      // Token spécial : ferme le mot en cours
+      if (current) { words.push(current); current = ''; }
+      continue;
+    }
+
+    if (decoded.startsWith(' ')) {
+      // ▁ → espace : début d'un nouveau mot
+      if (current) words.push(current);
+      current = decoded.slice(1); // supprime l'espace initial
+    } else {
+      // Sous-mot de continuation
+      current += decoded;
+    }
+  }
+  if (current) words.push(current);
+
+  return words.filter(w => w.length > 0);
+}
 
 // ── Stopwords français ────────────────────────────────────────────────────────
 
@@ -302,10 +371,10 @@ function isInfinitive(word: string): boolean {
 
 /**
  * Extrait les verbes d'action depuis un texte en français.
- * Utilise AggressiveTokenizerFr puis normalise les impératifs en infinitifs lisibles.
+ * Utilise le tokenizer CamemBERT puis normalise les impératifs en infinitifs lisibles.
  */
-function extractFrenchActions(text: string): string[] {
-  const tokens: string[] = tokenizerFr.tokenize(text.toLowerCase()) ?? [];
+async function extractFrenchActions(text: string): Promise<string[]> {
+  const tokens: string[] = (await tokenizeToWords(text.toLowerCase()));
   const verbs = new Set<string>();
 
   for (const token of tokens) {
@@ -334,7 +403,7 @@ function extractFrenchActions(text: string): string[] {
  *   2. Mots capitalisés non-début-de-phrase (noms propres de jeu)
  *   3. Noms communs apparaissant ≥ 2 fois (concepts-clés)
  */
-function extractFrenchEntities(text: string): string[] {
+async function extractFrenchEntities(text: string): Promise<string[]> {
   const entities = new Set<string>();
 
   // 1. Scan du lexique de jeu (terme exact OU même stem)
@@ -352,8 +421,8 @@ function extractFrenchEntities(text: string): string[] {
     }
   }
 
-  // 3. Mots fréquents (≥ 2 occurrences) via AggressiveTokenizerFr
-  const tokens: string[] = tokenizerFr.tokenize(lower) ?? [];
+  // 3. Mots fréquents (≥ 2 occurrences) via tokenizer CamemBERT
+  const tokens: string[] = await tokenizeToWords(lower);
   const freq: Record<string, number> = {};
   for (const w of tokens) {
     if (w.length > 3 && !STOPWORDS_FR.has(w) && !isInfinitive(w)) {
@@ -520,14 +589,14 @@ function extractSummary(text: string, maxSentences = 2): string {
 /**
  * Analyse NLP complète d'une section de règles en français.
  */
-export function analyzeText(text: string): NlpResult {
+export async function analyzeText(text: string): Promise<NlpResult> {
   if (!text || text.trim().length === 0) {
     return { entites: [], actions: [], resume: '' };
   }
 
   return {
-    entites: extractFrenchEntities(text),
-    actions: extractFrenchActions(text),
+    entites: await extractFrenchEntities(text),
+    actions: await extractFrenchActions(text),
     resume: extractSummary(text),
   };
 }

@@ -22,29 +22,34 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   let mod: any;
   try {
     // import() dynamique : compatible ESM (Vite SSR) et CLI tsx.
-    // @xenova/transformers expose pipeline comme export nommé (ESM)
-    // ou sous .default (interop CJS) selon l'environnement.
-    mod = await import('@xenova/transformers');
+    mod = await import('@huggingface/transformers');
     pipeline = (mod as any).pipeline ?? (mod as any).default?.pipeline;
   } catch {
     throw new Error(
-      'La bibliothèque "@xenova/transformers" n\'est pas installée.\n' +
-      'Exécutez : pnpm add @xenova/transformers',
+      'La bibliothèque "@huggingface/transformers" n\'est pas installée.\n' +
+      'Exécutez : pnpm add @huggingface/transformers',
     );
   }
 
-  // @xenova/transformers v2 n'utilise pas XDG_CACHE_HOME nativement.
+  // @huggingface/transformers v3 n'utilise pas XDG_CACHE_HOME nativement.
   // On lit la variable manuellement pour pointer vers le cache Docker (/hf-cache).
   const cacheDir = process.env.XDG_CACHE_HOME;
   if (cacheDir) {
     (mod as any).env.cacheDir = cacheDir;
   }
 
-  const extractor = await pipeline(
-    'feature-extraction',
-    'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-  );
+  try {
 
-  const output = await extractor(text, { pooling: 'mean', normalize: true });
-  return Array.from(output.data) as number[];
+    const extractor = await pipeline(
+      'feature-extraction',
+      'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
+      { dtype: 'fp32' },
+    );
+
+    const output = await extractor(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data) as number[];
+  } catch (err) {
+    console.error('Erreur lors de la génération de l\'embedding :', err);
+    throw new Error('Échec de la génération de l\'embedding. Voir les logs pour plus de détails.');
+  }
 }

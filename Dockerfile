@@ -24,11 +24,11 @@ COPY . .
 
 RUN pnpm run build:web
 
-# Force le cache Xenova dans /hf-cache pour que le chemin soit prévisible.
-# @xenova/transformers v2 n'utilise pas XDG_CACHE_HOME — on doit passer par
-# env.cacheDir (API JS). XDG_CACHE_HOME est relu dans embedder.ts au runtime.
+# Force le cache dans /hf-cache pour que le chemin soit prévisible.
+# @huggingface/transformers v3 lit env.cacheDir (API JS).
+# XDG_CACHE_HOME est relu dans embedder.ts au runtime.
 ENV XDG_CACHE_HOME=/hf-cache
-RUN printf 'import { env, pipeline } from "@xenova/transformers";\nenv.cacheDir = "/hf-cache";\nawait pipeline("feature-extraction", "Xenova/paraphrase-multilingual-MiniLM-L12-v2");\nconsole.log("[docker] Modele pre-telecharge dans /hf-cache.");\n' \
+RUN printf 'import { env, pipeline } from "@huggingface/transformers";\nenv.cacheDir = "/hf-cache";\nawait pipeline("feature-extraction", "Xenova/paraphrase-multilingual-MiniLM-L12-v2");\nconsole.log("[docker] Modele pre-telecharge dans /hf-cache.");\n' \
     | node --input-type=module \
  && ls /hf-cache
 

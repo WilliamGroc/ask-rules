@@ -7,6 +7,7 @@
  */
 
 import { extractText } from './modules/textExtractor';
+import type { PageTextResult } from 'pdf-parse';
 import { parseSections, classifySection } from './modules/sectionParser';
 import { analyzeText, detectMechanics } from './modules/nlpProcessor';
 import { extractGameMetadata, extractGameName } from './modules/gameExtractor';
@@ -31,7 +32,9 @@ export async function analyseFile(
   const { withEmbed = false, onSection } = options;
 
   // 1. Extraction du texte
-  const rawText = await extractText(filePath);
+  const pages: PageTextResult[] = await extractText(filePath);
+  // Reconstruction du texte complet avec marqueurs de page pour les modules aval
+  const rawText = pages.map(p => `%%PAGE:${p.num}%%\n${p.text}`).join('\n');
   const gameName = extractGameName(rawText);
   const metadata = extractGameMetadata(rawText);
 
@@ -45,7 +48,7 @@ export async function analyseFile(
   for (const [index, section] of rawSections.entries()) {
     onSection?.(index, rawSections.length, section.titre);
 
-    const nlpResult = analyzeText(section.contenu);
+    const nlpResult = await analyzeText(section.contenu);
     const mecaniques = detectMechanics(section.contenu);
     mecaniques.forEach(m => allMechanics.add(m));
 

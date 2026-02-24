@@ -17,9 +17,6 @@ analyser-ia/
 │       ├── nlpProcessor.ts       # Analyse NLP (entités, actions, résumé)
 │       └── embedder.ts           # (Optionnel) Génération d'embeddings
 ├── dist/                         # Sortie compilée (tsc)
-├── data/
-│   ├── manuel.txt                # Exemple de manuel d'entrée
-│   └── resultat.json             # Sortie générée automatiquement
 ├── tsconfig.json
 └── package.json
 ```
@@ -33,6 +30,8 @@ analyser-ia/
 
 ```bash
 pnpm install
+
+docker run -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postrgres -e POSTGRES_DB=ask_rules --name postgres_vector -p 5432:5432 -d ankane/pgvector
 ```
 
 ## Utilisation
@@ -47,7 +46,7 @@ npx ts-node src/analyser.ts data/manuel.txt
 npx ts-node src/analyser.ts data/manuel.pdf
 
 # Avec embeddings Transformers.js local (recommandé, multilingue, offline)
-pnpm add @xenova/transformers  # Installation unique
+pnpm add @huggingface/transformers  # Installation unique
 npx ts-node src/analyser.ts data/manuel.txt --embed
 # Au 1er lancement : télécharge le modèle (~50MB), puis utilise le cache
 
@@ -80,12 +79,14 @@ pnpm run start:dist     # node dist/ (après build)
 Le module `embedder.ts` supporte **3 modes** avec sélection automatique :
 
 ### Mode 1 : Transformers.js local (✅ Recommandé)
+
 ```bash
-pnpm add @xenova/transformers  # Installation unique
+pnpm add @huggingface/transformers  # Installation unique
 npx ts-node src/analyser.ts data/manuel.txt --embed
 ```
+
 - **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dims)
-- **Avantages** : 
+- **Avantages** :
   - ✅ 100% gratuit et offline (après 1er téléchargement)
   - ✅ Multilingue optimisé (français, anglais, etc.)
   - ✅ Pas de clé API requise
@@ -93,20 +94,24 @@ npx ts-node src/analyser.ts data/manuel.txt --embed
 - **1er lancement** : Télécharge automatiquement le modèle (~50MB), puis cache local
 
 ### Mode 2 : OpenAI (optionnel)
+
 ```bash
 export OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
 pnpm add openai  # Installation requise
 npx ts-node src/analyser.ts data/manuel.txt --embed
 ```
+
 - **Modèle** : `text-embedding-3-small` (1536 dims)
 - **Avantages** : Très performant, multilingue
 - **Inconvénients** : Payant, nécessite une connexion internet
 
 ### Mode 3 : TF-IDF local (fallback)
+
 ```bash
 # Automatique si aucun embedding disponible
 npx ts-node src/analyser.ts data/manuel.txt --embed
 ```
+
 - **Avantages** : Aucune dépendance externe, ultra-léger
 - **Inconvénients** : Qualité inférieure aux embeddings neuronaux
 
@@ -141,32 +146,32 @@ npx ts-node src/analyser.ts data/manuel.txt --embed
 
 ## Bibliothèques utilisées
 
-| Bibliothèque | Usage | Licence |
-|---|---|---|
-| `compromise` | NLP : extraction d'entités et de verbes | MIT |
-| `pdfreader` | Extraction de texte depuis des PDFs | Apache 2.0 |
-| `chalk` | Affichage coloré dans le terminal | MIT |
-| `typescript` | Compilation et typage statique | Apache 2.0 |
-| `ts-node` | Exécution TypeScript sans compilation préalable | MIT |
+| Bibliothèque | Usage                                           | Licence    |
+| ------------ | ----------------------------------------------- | ---------- |
+| `compromise` | NLP : extraction d'entités et de verbes         | MIT        |
+| `pdfreader`  | Extraction de texte depuis des PDFs             | Apache 2.0 |
+| `chalk`      | Affichage coloré dans le terminal               | MIT        |
+| `typescript` | Compilation et typage statique                  | Apache 2.0 |
+| `ts-node`    | Exécution TypeScript sans compilation préalable | MIT        |
 
 ## Interfaces TypeScript (src/types.ts)
 
 ```typescript
 interface Section {
-  titre:    string;
-  contenu:  string;
-  entites:  string[];
-  actions:  string[];
-  resume:   string;
+  titre: string;
+  contenu: string;
+  entites: string[];
+  actions: string[];
+  resume: string;
   embedding?: number[] | Record<string, number> | null;
 }
 
 interface AnalysisResult {
-  manuel:       string;
-  fichier:      string;
+  manuel: string;
+  fichier: string;
   date_analyse: string;
   statistiques: Statistics;
-  sections:     Section[];
+  sections: Section[];
 }
 ```
 
@@ -175,19 +180,23 @@ interface AnalysisResult {
 `compromise` est optimisé pour l'anglais. Pour analyser des textes en français :
 
 **Option 1 — Plugin compromise-fr**
+
 ```bash
 pnpm add compromise-fr
 ```
+
 ```typescript
-import nlp from 'compromise';
-import frPlugin from 'compromise-fr';
+import nlp from "compromise";
+import frPlugin from "compromise-fr";
 nlp.extend(frPlugin);
 ```
 
 **Option 2 — nlp.js (support multilingue natif)**
+
 ```bash
 pnpm add node-nlp @nlpjs/lang-fr
 ```
+
 Voir [documentation nlp.js](https://github.com/axa-group/nlp.js)
 
 ## Extension : base vectorielle
@@ -200,20 +209,23 @@ depuis un LLM, vous pouvez utiliser :
 - **[Weaviate](https://weaviate.io/)** — base vectorielle cloud/local
 
 Exemple d'indexation avec Chroma :
-```typescript
-import { ChromaClient } from 'chromadb';
-import type { AnalysisResult } from './src/types';
 
-const client     = new ChromaClient();
-const collection = await client.createCollection({ name: 'manuel' });
-const resultat: AnalysisResult = JSON.parse(fs.readFileSync('data/resultat.json', 'utf-8'));
+```typescript
+import { ChromaClient } from "chromadb";
+import type { AnalysisResult } from "./src/types";
+
+const client = new ChromaClient();
+const collection = await client.createCollection({ name: "manuel" });
+const resultat: AnalysisResult = JSON.parse(
+  fs.readFileSync("data/resultat.json", "utf-8"),
+);
 
 for (const section of resultat.sections) {
   await collection.add({
-    ids:        [section.titre],
-    embeddings: [section.embedding as number[]],  // vecteur OpenAI dense
-    documents:  [section.contenu],
-    metadatas:  [{ actions: section.actions.join(',') }],
+    ids: [section.titre],
+    embeddings: [section.embedding as number[]], // vecteur OpenAI dense
+    documents: [section.contenu],
+    metadatas: [{ actions: section.actions.join(",") }],
   });
 }
 ```

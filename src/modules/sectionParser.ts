@@ -414,7 +414,6 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
   // ── Phase 2 : Look-ahead — invalide les titres sans contenu suffisant ─────────
   // Un titre non confirmé (< MIN_LOOKAHEAD_WORDS mots) est rétrogradé :
   // son titre devient un paragraphe de la section précédente.
-
   const pass2: RawSection[] = [];
   for (const section of pass1) {
     const wc = wordCount(section.contenu);
