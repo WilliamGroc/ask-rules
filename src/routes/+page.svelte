@@ -1,11 +1,21 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
-  import type { PageData, ActionData } from './$types';
+  import { enhance } from "$app/forms";
+  import type { PageData, ActionData } from "./$types";
 
   export let data: PageData;
   export let form: ActionData;
 
   let isLoading = false;
+  let selectedGame = "";
+  let lastQuestion = "";
+  let formEl: HTMLFormElement;
+
+  function handleTextareaKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      formEl.requestSubmit();
+    }
+  }
 </script>
 
 <svelte:head>
@@ -25,12 +35,20 @@
 
   <!-- Formulaire -->
   <form
+    bind:this={formEl}
     method="POST"
     class="ask-form"
     use:enhance={() => {
       isLoading = true;
+      const savedGame = selectedGame;
+      const textarea = formEl.querySelector(
+        'textarea[name="question"]',
+      ) as HTMLTextAreaElement;
+      const savedQuestion = textarea?.value ?? "";
       return async ({ update }) => {
         await update();
+        selectedGame = savedGame;
+        lastQuestion = savedQuestion;
         isLoading = false;
       };
     }}
@@ -42,12 +60,17 @@
       required
       rows="3"
       disabled={isLoading}
-      autofocus
+      on:keydown={handleTextareaKeydown}
     ></textarea>
 
     <div class="form-footer">
       {#if data.games.length > 1}
-        <select name="jeu" class="game-select" disabled={isLoading}>
+        <select
+          name="jeu"
+          class="game-select"
+          disabled={isLoading}
+          bind:value={selectedGame}
+        >
           <option value="">Sélection automatique</option>
           {#each data.games as g}
             <option value={g.jeu}>{g.jeu}</option>
@@ -82,6 +105,11 @@
           {form.error}
         </div>
       {:else}
+        <!-- Question posée -->
+        {#if lastQuestion}
+          <p class="question-reminder">« {lastQuestion} »</p>
+        {/if}
+
         <!-- Jeu sélectionné -->
         <div class="game-badge">
           <span class="game-icon">🎲</span>
@@ -109,7 +137,7 @@
         <!-- Sections source -->
         <details class="sources-details">
           <summary class="sources-summary">
-            {form.sections.length} section{form.sections.length > 1 ? 's' : ''} source
+            {form.sections.length} section{form.sections.length > 1 ? "s" : ""} source
           </summary>
           <div class="sources-list">
             {#each form.sections as s}
@@ -119,14 +147,19 @@
                   <div class="source-meta">
                     {#if s.page_debut}
                       <span class="source-page">
-                        p.{s.page_debut}{s.page_fin && s.page_fin !== s.page_debut ? `–${s.page_fin}` : ''}
+                        p.{s.page_debut}{s.page_fin &&
+                        s.page_fin !== s.page_debut
+                          ? `–${s.page_fin}`
+                          : ""}
                       </span>
                     {/if}
-                    <span class="source-score">{(s.score * 100).toFixed(0)}%</span>
+                    <span class="source-score"
+                      >{(s.score * 100).toFixed(0)}%</span
+                    >
                   </div>
                 </div>
                 <p class="source-text">
-                  {s.resume || s.contenu.slice(0, 220) + '…'}
+                  {s.resume || s.contenu.slice(0, 220) + "…"}
                 </p>
               </div>
             {/each}
@@ -140,10 +173,10 @@
   <footer class="footer">
     {#if data.games.length > 0}
       <span
-        >{data.games.length} jeu{data.games.length > 1 ? 'x' : ''} indexé{data
+        >{data.games.length} jeu{data.games.length > 1 ? "x" : ""} indexé{data
           .games.length > 1
-          ? 's'
-          : ''}</span
+          ? "s"
+          : ""}</span
       >
     {/if}
   </footer>

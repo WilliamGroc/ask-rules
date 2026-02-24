@@ -437,6 +437,13 @@ details[open] .sources-summary::before {
   animation: fadeIn .3s ease;
 }
 
+.question-reminder {
+  color: #a78bfa;
+  font-size: .95rem;
+  font-style: italic;
+  margin: 0;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
