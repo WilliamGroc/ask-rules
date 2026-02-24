@@ -48,8 +48,7 @@ export const actions: Actions = {
     // ── Sauvegarde temporaire ─────────────────────────────────────────────────
     const tmpPath = path.join(os.tmpdir(), `ask-rules-${Date.now()}${ext}`);
     try {
-      const buffer = Buffer.from(await fichier.arrayBuffer());
-      fs.writeFileSync(tmpPath, buffer);
+      fs.writeFileSync(tmpPath, new Uint8Array(await fichier.arrayBuffer()));
 
       // ── Analyse NLP ───────────────────────────────────────────────────────
       const result = await analyseFile(tmpPath, { withEmbed: false });

@@ -97,7 +97,7 @@ async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename:
   }
 
   const tmpPath = path.join(os.tmpdir(), `ask-rules-url-${Date.now()}${ext}`);
-  fs.writeFileSync(tmpPath, content);
+  fs.writeFileSync(tmpPath, new Uint8Array(content));
 
   // Nom de fichier lisible : chemin URL ou hostname
   const basename = path.basename(parsed.pathname).replace(/[?#].*$/, '') || parsed.hostname;
@@ -163,7 +163,7 @@ export const POST: RequestHandler = async ({ request }) => {
             return;
           }
           tmpPath = path.join(os.tmpdir(), `ask-rules-${Date.now()}${ext}`);
-          fs.writeFileSync(tmpPath, Buffer.from(await fichier.arrayBuffer()));
+          fs.writeFileSync(tmpPath, new Uint8Array(await fichier.arrayBuffer()));
           sourceFilename = fichier.name;
         }
 

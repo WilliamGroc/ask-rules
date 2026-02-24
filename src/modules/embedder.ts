@@ -14,40 +14,65 @@
 export const EMBEDDING_DIM = 384;
 
 /**
+ * Singleton de l'extracteur — initialisé une seule fois, réutilisé pour toutes
+ * les sections. Évite de recharger le modèle ONNX (~120 Mo en q8) à chaque appel.
+ */
+let extractorInstance: any = null;
+let extractorInitPromise: Promise<any> | null = null;
+
+async function getExtractor(): Promise<any> {
+  if (extractorInstance) return extractorInstance;
+
+  // Empêche plusieurs initialisations simultanées (ex. Promise.all)
+  if (!extractorInitPromise) {
+    extractorInitPromise = (async () => {
+      let pipeline: any;
+      let mod: any;
+      try {
+        mod = await import('@huggingface/transformers');
+        pipeline = (mod as any).pipeline ?? (mod as any).default?.pipeline;
+      } catch {
+        throw new Error(
+          'La bibliothèque "@huggingface/transformers" n\'est pas installée.\n' +
+          'Exécutez : pnpm add @huggingface/transformers',
+        );
+      }
+
+      // @huggingface/transformers v3 n'utilise pas XDG_CACHE_HOME nativement.
+      const cacheDir = process.env.XDG_CACHE_HOME;
+      if (cacheDir) {
+        (mod as any).env.cacheDir = cacheDir;
+      }
+
+      // q8 (int8 quantisé) : ~120 Mo vs ~470 Mo pour fp32.
+      // La perte de qualité est négligeable pour les embeddings de phrases.
+      extractorInstance = await pipeline(
+        'feature-extraction',
+        'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
+        { dtype: 'q8' },
+      );
+      return extractorInstance;
+    })();
+  }
+
+  return extractorInitPromise;
+}
+
+/**
  * Génère un embedding dense de 384 dimensions via Transformers.js.
  * Retourne un tableau de nombres normalisé (L2).
+ *
+ * Le tenseur ONNX intermédiaire est explicitement libéré après extraction
+ * pour éviter une accumulation sur le heap WASM section après section.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  let pipeline: any;
-  let mod: any;
   try {
-    // import() dynamique : compatible ESM (Vite SSR) et CLI tsx.
-    mod = await import('@huggingface/transformers');
-    pipeline = (mod as any).pipeline ?? (mod as any).default?.pipeline;
-  } catch {
-    throw new Error(
-      'La bibliothèque "@huggingface/transformers" n\'est pas installée.\n' +
-      'Exécutez : pnpm add @huggingface/transformers',
-    );
-  }
-
-  // @huggingface/transformers v3 n'utilise pas XDG_CACHE_HOME nativement.
-  // On lit la variable manuellement pour pointer vers le cache Docker (/hf-cache).
-  const cacheDir = process.env.XDG_CACHE_HOME;
-  if (cacheDir) {
-    (mod as any).env.cacheDir = cacheDir;
-  }
-
-  try {
-
-    const extractor = await pipeline(
-      'feature-extraction',
-      'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-      { dtype: 'fp32' },
-    );
-
+    const extractor = await getExtractor();
     const output = await extractor(text, { pooling: 'mean', normalize: true });
-    return Array.from(output.data) as number[];
+    const data = Array.from(output.data) as number[];
+    // Libère le tenseur ONNX du heap WASM — sans cela, chaque appel fuit ~200 Ko.
+    output.dispose?.();
+    return data;
   } catch (err) {
     console.error('Erreur lors de la génération de l\'embedding :', err);
     throw new Error('Échec de la génération de l\'embedding. Voir les logs pour plus de détails.');
