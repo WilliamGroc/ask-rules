@@ -10,10 +10,29 @@
   let lastQuestion = "";
   let formEl: HTMLFormElement;
 
+  const suggestedQuestions = [
+    "Comment jouer ?",
+    "Comment gagner ?",
+    "Comment se déroule un tour ?",
+    "Comment se déroule un combat ?",
+    "Quelle est la mise en place ?",
+    "Quelles sont les actions disponibles ?",
+  ];
+
   function handleTextareaKeydown(e: KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       formEl.requestSubmit();
+    }
+  }
+
+  function fillQuestion(question: string) {
+    const textarea = formEl.querySelector(
+      'textarea[name="question"]',
+    ) as HTMLTextAreaElement;
+    if (textarea) {
+      textarea.value = question;
+      textarea.focus();
     }
   }
 </script>
@@ -53,6 +72,19 @@
       };
     }}
   >
+    <div class="suggested-tags">
+      {#each suggestedQuestions as question}
+        <button
+          type="button"
+          class="tag-btn"
+          on:click={() => fillQuestion(question)}
+          disabled={isLoading}
+        >
+          {question}
+        </button>
+      {/each}
+    </div>
+
     <textarea
       name="question"
       class="question-input"
@@ -181,3 +213,41 @@
     {/if}
   </footer>
 </div>
+
+<style>
+  .suggested-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .tag-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 1rem;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  .tag-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+  }
+
+  .tag-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .tag-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+</style>
