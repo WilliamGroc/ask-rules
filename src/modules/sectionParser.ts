@@ -282,6 +282,45 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
   return none;
 }
 
+// ── Titre inline "Titre : Contenu" ───────────────────────────────────────────
+
+/**
+ * Détecte les lignes du format « Titre : Contenu » où le titre et le contenu
+ * partagent la même ligne (typique des rubriques descriptives de livrets de jeu).
+ *
+ * Exemples reconnus :
+ *   "Monastère (jaune) : Il y a 26 tuiles jaunes différentes…"
+ *   "Navire (bleu) : Quand un joueur ajoute une tuile navire…"
+ *   "Mine (gris) : Ces tuiles sont les seules sans effet immédiat…"
+ *
+ * Conditions de reconnaissance :
+ *   - Séparateur strict « espace-colon-espace » ` : `
+ *   - Titre (partie gauche) : commence par une majuscule, ≤ 6 mots,
+ *     pas un article/pronom/verbe introducteur de phrase
+ *   - Contenu (partie droite) : ≥ 5 mots (substance suffisante)
+ *
+ * Retourne null si les conditions ne sont pas remplies.
+ */
+function splitInlineTitleLine(line: string): { title: string; content: string } | null {
+  const sepIdx = line.indexOf(' : ');
+  if (sepIdx < 0) return null;
+
+  const titlePart = line.slice(0, sepIdx).trim();
+  const contentPart = line.slice(sepIdx + 3).trim();
+
+  if (titlePart.length < 2) return null;
+  if (wordCount(titlePart) > 6) return null;
+  if (wordCount(contentPart) < 5) return null;
+
+  // Le titre doit commencer par une majuscule
+  if (!/^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ]/.test(titlePart)) return null;
+
+  // Rejeter les introducteurs de phrase ordinaires
+  if (isContentStarter(titlePart) || isVerbStarter(titlePart)) return null;
+
+  return { title: normalizeTitle(titlePart), content: contentPart };
+}
+
 // ── Classification sémantique ─────────────────────────────────────────────────
 
 /**
@@ -391,6 +430,22 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
     if (isNoiseLine(rawLine)) continue;
 
     const isBlank = rawLine.trim().length === 0;
+
+    // Titre inline « Titre : Contenu » — intercepté avant detectHeading
+    if (!isBlank) {
+      const inlineSplit = splitInlineTitleLine(rawLine.trim());
+      if (inlineSplit) {
+        flushSection();
+        currentTitle = inlineSplit.title;
+        currentNiveau = 2;
+        currentContent = [inlineSplit.content];
+        sectionPage = currentPage;
+        lastContentPage = currentPage;
+        prevWasBlank = false;
+        continue;
+      }
+    }
+
     const { isHeading, title, niveau } = detectHeading(rawLine, { prevWasBlank });
 
     if (isHeading) {
