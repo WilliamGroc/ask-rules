@@ -1,9 +1,34 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
-  import type { PageData, ActionData } from "./$types";
+  import type { PageData } from "./$types";
+  import type { GameSectionType } from "../types";
 
   export let data: PageData;
-  export let form: ActionData;
+  export let form:
+    | {
+        ok: true;
+        jeu: string;
+        jeu_id: number;
+        matchedName: boolean;
+        answer: string;
+        used_llm: boolean;
+        model: string;
+        fichier: string | null;
+        sections: Array<{
+          titre: string;
+          type_section: GameSectionType;
+          resume: string;
+          contenu: string;
+          score: number;
+          page_debut: number | null;
+          page_fin: number | null;
+        }>;
+      }
+    | {
+        ok: false;
+        error: string;
+      }
+    | null;
 
   let isLoading = false;
   let selectedGame = "";
@@ -148,6 +173,28 @@
           <span>{form.jeu}</span>
           {#if form.matchedName}<span class="badge-tag">mentionné</span>{/if}
         </div>
+
+        <!-- Lien de téléchargement du fichier source -->
+        {#if form.fichier}
+          <div class="file-download">
+            <a
+              href="/files/{form.fichier}"
+              class="file-download-link"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="file-icon">📄</span>
+              <span class="file-text">
+                <span class="file-label">Fichier source</span>
+                <span class="file-name"
+                  >{form.fichier.split("/").pop()?.replace(/^\d+_/, "") ||
+                    "Télécharger"}</span
+                >
+              </span>
+              <span class="file-arrow">↓</span>
+            </a>
+          </div>
+        {/if}
 
         <!-- Réponse LLM -->
         <div class="answer-card">

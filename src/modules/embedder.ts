@@ -78,3 +78,43 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     throw new Error('Échec de la génération de l\'embedding. Voir les logs pour plus de détails.');
   }
 }
+
+/**
+ * Génère un embedding pour une section, en enrichissant le contenu avec
+ * la hiérarchie si les métadonnées de chunking sont présentes.
+ * 
+ * Utilisé pour l'insertion en flux dans les routes d'import.
+ * 
+ * @param section - Section avec métadonnées optionnelles de chunking
+ * @returns Embedding 384 dimensions
+ */
+export async function generateEmbeddingForSection(
+  section: {
+    contenu: string;
+    hierarchy_path?: string;
+    chunk_index?: number;
+    total_chunks?: number;
+  },
+): Promise<number[]> {
+  // Si métadonnées de chunking présentes, enrichit le contenu
+  const hasChunkMetadata = section.hierarchy_path !== undefined;
+
+  if (hasChunkMetadata) {
+    const parts: string[] = [];
+
+    if (section.hierarchy_path) {
+      parts.push(`[${section.hierarchy_path}]`);
+    }
+
+    if (section.total_chunks && section.total_chunks > 1) {
+      parts.push(`(Partie ${(section.chunk_index ?? 0) + 1}/${section.total_chunks})`);
+    }
+
+    parts.push('');
+    parts.push(section.contenu);
+
+    return generateEmbedding(parts.join('\n'));
+  }
+
+  return generateEmbedding(section.contenu);
+}

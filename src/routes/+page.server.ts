@@ -9,9 +9,10 @@
 import 'dotenv/config';
 
 import { fail } from '@sveltejs/kit';
-import { listGames } from '../modules/knowledgeBase';
+import { listGames, findGame } from '../modules/knowledgeBase';
 import { retrieveFromBestGame, retrieveForGame } from '../modules/retriever';
 import { queryLLM } from '../modules/llmClient';
+import { buildContext } from '../modules/contextBuilder';
 import type { Actions, PageServerLoad } from './$types';
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -35,9 +36,13 @@ export const actions: Actions = {
 
     try {
       const topN = 4;
+
+      // Active l'hybrid search (dense + sparse) pour une meilleure pertinence
+      const useHybrid = true;
+
       const selection = jeuFilter
-        ? await retrieveForGame(question, jeuFilter, topN)
-        : await retrieveFromBestGame(question, topN);
+        ? await retrieveForGame(question, jeuFilter, topN, { useHybrid })
+        : await retrieveFromBestGame(question, topN, 0.1, { useHybrid });
 
       if (!selection || selection.sections.length === 0) {
         return fail(404, {
@@ -46,22 +51,27 @@ export const actions: Actions = {
         });
       }
 
-      const context = selection.sections
-        .map((r, i) =>
-          `--- Section ${i + 1} : "${r.section.titre}" [${r.section.type_section}]\n` +
-          r.section.contenu.slice(0, 800),
-        )
-        .join('\n\n');
+      // Récupère les métadonnées du jeu pour enrichir le contexte
+      const gameEntry = await findGame(selection.jeu_id);
+      const gameMetadata = gameEntry?.metadata;
+
+      // Construit le contexte enrichi avec toutes les métadonnées disponibles
+      const context = buildContext(selection.sections, selection.jeu, {
+        format: 'enriched', // ou 'compact' pour un format plus concis
+        gameMetadata,
+      });
 
       const llm = await queryLLM(question, context);
 
       return {
         ok: true as const,
         jeu: selection.jeu,
+        jeu_id: selection.jeu_id,
         matchedName: selection.matchedName,
         answer: llm.answer,
         used_llm: llm.used_llm,
         model: llm.model,
+        fichier: gameEntry?.fichier ?? null,
         sections: selection.sections.map(s => ({
           titre: s.section.titre,
           type_section: s.section.type_section,

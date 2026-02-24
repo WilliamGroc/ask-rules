@@ -1,16 +1,27 @@
 /**
  * retriever.ts
- * Recherche sémantique dans PostgreSQL via pgvector (cosinus).
+ * Recherche sémantique dans PostgreSQL via pgvector (cosinus) ou hybrid search.
  *
- * Pipeline :
+ * Deux modes disponibles :
+ *   1. Dense (défaut) : Embeddings uniquement via pgvector
+ *   2. Hybrid : Combine embeddings (dense) + full-text BM25 (sparse)
+ *
+ * Pipeline Dense :
  *   1. Génère un embedding dense 384 dims de la question (Transformers.js)
  *   2. Requête pgvector avec l'opérateur <=> (distance cosinus)
  *   3. Sélection du jeu le plus pertinent
  *   4. Retour des N sections les plus proches du jeu sélectionné
+ *
+ * Pipeline Hybrid :
+ *   1. Recherche dense (top 20) via embeddings
+ *   2. Recherche sparse (top 20) via PostgreSQL full-text
+ *   3. Fusion RRF (Reciprocal Rank Fusion)
+ *   4. Retour des N meilleurs résultats fusionnés
  */
 
 import pool from './db';
 import { generateEmbedding } from './embedder';
+import { hybridSearch, hybridSearchForGame, hybridSearchBestGame } from './hybridSearch';
 import type { ScoredSection, StoredSection } from '../types';
 
 /** Résultat de la sélection d'un jeu pour une requête donnée. */
@@ -22,6 +33,18 @@ export interface GameSelection {
   /** True si le nom du jeu a été détecté dans la question */
   matchedName: boolean;
   sections: ScoredSection[];
+}
+
+/** Options de recherche */
+export interface RetrievalOptions {
+  /** Utilise l'hybrid search (dense + sparse) au lieu de dense seul */
+  useHybrid?: boolean;
+  /** Nombre de sections à retourner */
+  topN?: number;
+  /** Seuil minimal de similarité (dense uniquement) */
+  minScore?: number;
+  /** Active les logs de debug */
+  debug?: boolean;
 }
 
 // ── Utilitaire ────────────────────────────────────────────────────────────────
@@ -72,13 +95,81 @@ function rowToScoredSection(row: Record<string, any>): ScoredSection {
  * Stratégie de sélection (ordre de priorité) :
  *   1. Seul jeu en base → le choisir directement.
  *   2. Nom d'un jeu présent littéralement dans la question → ce jeu.
- *   3. Sinon → jeu avec le score vectoriel agrégé le plus élevé.
+ *   3. Sinon → jeu avec le score agrégé le plus élevé.
  *
  * @param query    - Question ou mots-clés
  * @param topN     - Nombre de sections renvoyées (défaut : 4)
  * @param minScore - Seuil minimal de similarité cosinus (défaut : 0.1)
+ * @param options  - Options avancées (hybrid search, debug...)
  */
 export async function retrieveFromBestGame(
+  query: string,
+  topN = 4,
+  minScore = 0.1,
+  options: Omit<RetrievalOptions, 'topN' | 'minScore'> = {},
+): Promise<GameSelection | null> {
+  // Si hybrid search activé, utilise la nouvelle implémentation
+  if (options.useHybrid) {
+    return hybridSearchBestGame(query, topN);
+  }
+
+  // Sinon, utilise l'ancienne implémentation (dense uniquement)
+  return _retrieveFromBestGameDense(query, topN, minScore);
+}
+
+/**
+ * Recherche des sections pour une question dans un jeu spécifique.
+ * Le jeu est identifié par correspondance partielle sur le nom (insensible à la casse).
+ * 
+ * @param query - Question utilisateur
+ * @param gameName - Nom partiel ou complet du jeu
+ * @param topN - Nombre de sections à retourner
+ * @param options - Options avancées
+ */
+export async function retrieveForGame(
+  query: string,
+  gameName: string,
+  topN = 4,
+  options: Omit<RetrievalOptions, 'topN'> = {},
+): Promise<GameSelection | null> {
+  // Résout le gameId depuis le nom
+  const normalize = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const needle = normalize(gameName);
+
+  const res = await pool.query<{ id: string; jeu: string }>(
+    'SELECT id, jeu FROM games',
+  );
+  const match = res.rows.find(g => normalize(g.jeu).includes(needle));
+  if (!match) return null;
+
+  // Si hybrid search activé
+  if (options.useHybrid) {
+    const results = await hybridSearchForGame(query, match.id, topN);
+    if (results.length === 0) return null;
+
+    return {
+      jeu: match.jeu,
+      jeu_id: match.id,
+      relevanceScore: results.slice(0, 3).reduce((s, r) => s + r.score, 0),
+      matchedName: false,
+      sections: results,
+    };
+  }
+
+  // Sinon, mode dense
+  const queryEmbedding = await generateEmbedding(query);
+  const vectorLiteral = toVectorLiteral(queryEmbedding);
+  return searchWithinGame(match.id, match.jeu, vectorLiteral, topN, 0.01, false);
+}
+
+// ── Implémentation Dense (Legacy) ─────────────────────────────────────────────
+
+/**
+ * Implémentation originale de la recherche dense uniquement.
+ * Conservée pour backward compatibility et comparaison.
+ */
+async function _retrieveFromBestGameDense(
   query: string,
   topN = 4,
   minScore = 0.1,
@@ -125,31 +216,6 @@ export async function retrieveFromBestGame(
 
   // Priorité 3 : sélectionner le meilleur jeu par score agrégé
   return selectBestGameByScore(games, vectorLiteral, topN, minScore);
-}
-
-/**
- * Recherche des sections pour une question dans un jeu spécifique.
- * Le jeu est identifié par correspondance partielle sur le nom (insensible à la casse).
- */
-export async function retrieveForGame(
-  query: string,
-  gameName: string,
-  topN = 4,
-): Promise<GameSelection | null> {
-  const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const needle = normalize(gameName);
-
-  const res = await pool.query<{ id: string; jeu: string }>(
-    'SELECT id, jeu FROM games',
-  );
-  const match = res.rows.find(g => normalize(g.jeu).includes(needle));
-  if (!match) return null;
-
-  const queryEmbedding = await generateEmbedding(query);
-  const vectorLiteral = toVectorLiteral(queryEmbedding);
-
-  return searchWithinGame(match.id, match.jeu, vectorLiteral, topN, 0.01, false);
 }
 
 // ── Helpers SQL ───────────────────────────────────────────────────────────────

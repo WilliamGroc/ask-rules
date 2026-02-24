@@ -12,8 +12,9 @@ import os from 'os';
 import path from 'path';
 import { fail } from '@sveltejs/kit';
 import { listGames, openSectionWriter, gameExists, countSections, slugify } from '../../modules/knowledgeBase';
-import { generateEmbedding } from '../../modules/embedder';
+import { generateEmbeddingForSection } from '../../modules/embedder';
 import { analyseFile } from '../../pipeline';
+import { saveUploadedFile } from '../../modules/fileStorage';
 import type { Actions, PageServerLoad } from './$types';
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -45,16 +46,21 @@ export const actions: Actions = {
       return fail(400, { ok: false as const, error: 'Format non supporté. Utilisez un fichier .txt ou .pdf.' });
     }
 
-    // ── Sauvegarde temporaire ─────────────────────────────────────────────────
+    // ── Préparation du stockage ───────────────────────────────────────────────
+    const gameSlug = slugify(gameName);
+    const fileContent = new Uint8Array(await fichier.arrayBuffer());
+
+    // Sauvegarde temporaire pour l'analyse
     const tmpPath = path.join(os.tmpdir(), `ask-rules-${Date.now()}${ext}`);
     try {
-      fs.writeFileSync(tmpPath, new Uint8Array(await fichier.arrayBuffer()));
+      fs.writeFileSync(tmpPath, fileContent);
 
       // ── Analyse NLP ───────────────────────────────────────────────────────
-      const result = await analyseFile(tmpPath, { withEmbed: false });
+      const result = await analyseFile(tmpPath, { withEmbed: false, withChunking: true });
       result.jeu = gameName;
 
-      const gameSlug = slugify(gameName);
+      // ── Sauvegarde permanente du fichier ──────────────────────────────────
+      const storedFilePath = saveUploadedFile(gameSlug, fichier.name, fileContent);
       const alreadyExists = await gameExists(gameSlug);
       const isMerge = mode === 'merge' && alreadyExists;
       const idOffset = isMerge ? await countSections(gameSlug) : 0;
@@ -64,7 +70,7 @@ export const actions: Actions = {
         gameSlug,
         {
           jeu: gameName,
-          fichier: fichier.name,
+          fichier: storedFilePath,
           date_ajout: new Date().toISOString(),
           metadata: result.metadata,
           statistiques: result.statistiques,
@@ -75,7 +81,7 @@ export const actions: Actions = {
       let insertedCount = 0;
       try {
         for (let i = 0; i < result.sections.length; i++) {
-          const embedding = await generateEmbedding(result.sections[i].contenu);
+          const embedding = await generateEmbeddingForSection(result.sections[i]);
           await writer.insertSection({
             ...result.sections[i],
             section_id: `${gameSlug}_${idOffset + i}`,

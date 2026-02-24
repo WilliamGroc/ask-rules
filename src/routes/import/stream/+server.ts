@@ -26,8 +26,9 @@ import os from 'os';
 import path from 'path';
 import type { RequestHandler } from './$types';
 import { openSectionWriter, gameExists, countSections, slugify } from '../../../modules/knowledgeBase';
-import { generateEmbedding } from '../../../modules/embedder';
+import { generateEmbeddingForSection } from '../../../modules/embedder';
 import { analyseFile } from '../../../pipeline';
+import { saveUploadedFile } from '../../../modules/fileStorage';
 
 // ── Helpers URL ───────────────────────────────────────────────────────────────
 
@@ -125,6 +126,10 @@ export const POST: RequestHandler = async ({ request }) => {
         const mode = String(formData.get('mode') ?? 'replace') as 'replace' | 'merge';
         const importMode = String(formData.get('importMode') ?? 'file') as 'file' | 'url';
 
+        const gameSlug = slugify(gameName);
+        let sourceFilename = '';
+        let storedFilePath = '';
+
         // ── Validation commune ────────────────────────────────────────────────
         if (!gameName) {
           send({ type: 'error', message: 'Le nom du jeu est requis.' });
@@ -132,7 +137,6 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         // ── Résolution de la source ───────────────────────────────────────────
-        let sourceFilename: string;
 
         if (importMode === 'url') {
           const urlInput = String(formData.get('url') ?? '').trim();
@@ -150,6 +154,10 @@ export const POST: RequestHandler = async ({ request }) => {
           send({ type: 'step', message: `Téléchargement depuis ${new URL(urlInput).hostname}…` });
           ({ tmpPath, filename: sourceFilename } = await fetchUrlToTemp(urlInput));
 
+          // Sauvegarde permanente du fichier téléchargé
+          const urlContent = fs.readFileSync(tmpPath);
+          storedFilePath = saveUploadedFile(gameSlug, sourceFilename, urlContent);
+
         } else {
           // ── Mode fichier (comportement d'origine) ─────────────────────────
           const fichier = formData.get('fichier') as File | null;
@@ -163,13 +171,17 @@ export const POST: RequestHandler = async ({ request }) => {
             return;
           }
           tmpPath = path.join(os.tmpdir(), `ask-rules-${Date.now()}${ext}`);
-          fs.writeFileSync(tmpPath, new Uint8Array(await fichier.arrayBuffer()));
+          const fileContent = new Uint8Array(await fichier.arrayBuffer());
+          fs.writeFileSync(tmpPath, fileContent);
           sourceFilename = fichier.name;
+
+          // Sauvegarde permanente du fichier uploadé
+          storedFilePath = saveUploadedFile(gameSlug, fichier.name, fileContent);
         }
 
         // ── Extraction + NLP ──────────────────────────────────────────────────
         send({ type: 'step', message: 'Extraction du texte…' });
-        const result = await analyseFile(tmpPath, { withEmbed: false });
+        const result = await analyseFile(tmpPath, { withEmbed: false, withChunking: true });
         result.jeu = gameName;
 
         const n = result.sections.length;
@@ -178,7 +190,6 @@ export const POST: RequestHandler = async ({ request }) => {
           message: `Analyse NLP — ${n} section${n > 1 ? 's' : ''} détectée${n > 1 ? 's' : ''}`,
         });
 
-        const gameSlug = slugify(gameName);
         const alreadyExists = await gameExists(gameSlug);
         const isMerge = mode === 'merge' && alreadyExists;
         const idOffset = isMerge ? await countSections(gameSlug) : 0;
@@ -192,7 +203,7 @@ export const POST: RequestHandler = async ({ request }) => {
           gameSlug,
           {
             jeu: gameName,
-            fichier: sourceFilename,
+            fichier: storedFilePath,
             date_ajout: new Date().toISOString(),
             metadata: result.metadata,
             statistiques: result.statistiques,
@@ -204,7 +215,7 @@ export const POST: RequestHandler = async ({ request }) => {
         try {
           for (let i = 0; i < n; i++) {
             send({ type: 'embedding_progress', current: i + 1, total: n });
-            const embedding = await generateEmbedding(result.sections[i].contenu);
+            const embedding = await generateEmbeddingForSection(result.sections[i]);
             await writer.insertSection({
               ...result.sections[i],
               section_id: `${gameSlug}_${idOffset + i}`,

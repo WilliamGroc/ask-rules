@@ -8,6 +8,7 @@
 
 import pool from './db';
 import type { KnowledgeBaseEntry, StoredSection, GameMetadata, Statistics } from '../types';
+import { deleteGameFiles } from './fileStorage';
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
 
@@ -70,8 +71,8 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
         `INSERT INTO sections
            (id, game_id, titre, niveau, type_section, contenu,
             entites, actions, resume, mecaniques, embedding,
-            page_debut, page_fin)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            page_debut, page_fin, hierarchy_path, chunk_index, total_chunks)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
           section.section_id,
           entry.id,
@@ -86,6 +87,9 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
           embedding,
           section.page_debut ?? null,
           section.page_fin ?? null,
+          section.hierarchy_path ?? '',
+          section.chunk_index ?? 0,
+          section.total_chunks ?? 1,
         ],
       );
     }
@@ -141,8 +145,8 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
         `INSERT INTO sections
            (id, game_id, titre, niveau, type_section, contenu,
             entites, actions, resume, mecaniques, embedding,
-            page_debut, page_fin)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            page_debut, page_fin, hierarchy_path, chunk_index, total_chunks)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
           section.section_id,
           entry.id,
@@ -157,6 +161,9 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
           embedding,
           section.page_debut ?? null,
           section.page_fin ?? null,
+          section.hierarchy_path ?? '',
+          section.chunk_index ?? 0,
+          section.total_chunks ?? 1,
         ],
       );
     }
@@ -228,13 +235,14 @@ export async function openSectionWriter(
         `INSERT INTO sections
            (id, game_id, titre, niveau, type_section, contenu,
             entites, actions, resume, mecaniques, embedding,
-            page_debut, page_fin)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            page_debut, page_fin, hierarchy_path, chunk_index, total_chunks)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
           section.section_id, gameId,
           section.titre, section.niveau, section.type_section, section.contenu,
           section.entites, section.actions, section.resume, section.mecaniques,
           embedding, section.page_debut ?? null, section.page_fin ?? null,
+          section.hierarchy_path ?? '', section.chunk_index ?? 0, section.total_chunks ?? 1,
         ],
       );
     },
@@ -271,9 +279,11 @@ export async function findGame(idOrPath: string): Promise<KnowledgeBaseEntry | n
   };
 }
 
-/** Supprime un jeu et toutes ses sections (CASCADE). */
+/** Supprime un jeu et toutes ses sections (CASCADE), ainsi que ses fichiers uploadés. */
 export async function removeGame(id: string): Promise<void> {
   await pool.query('DELETE FROM games WHERE id = $1', [id]);
+  // Supprime aussi les fichiers physiques
+  deleteGameFiles(id);
 }
 
 /** Retourne la liste de tous les jeux (sans leurs sections). */
@@ -313,5 +323,8 @@ function rowToStoredSection(row: Record<string, any>): StoredSection {
     embedding: row.embedding ?? null,
     page_debut: row.page_debut ?? undefined,
     page_fin: row.page_fin ?? undefined,
+    hierarchy_path: row.hierarchy_path ?? undefined,
+    chunk_index: row.chunk_index ?? undefined,
+    total_chunks: row.total_chunks ?? undefined,
   };
 }

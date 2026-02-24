@@ -100,6 +100,12 @@ export interface GameAnalysisResult {
 export interface StoredSection extends GameSection {
   /** Identifiant unique : "{jeu_slug}_{index}" */
   section_id: string;
+  /** Chemin hiérarchique complet (ex: "MATÉRIEL > Cartes") */
+  hierarchy_path?: string;
+  /** Index du chunk pour cette section (0, 1, 2...) */
+  chunk_index?: number;
+  /** Nombre total de chunks pour cette section */
+  total_chunks?: number;
 }
 
 /** Entrée dans la base de connaissance pour un jeu */
