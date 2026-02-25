@@ -241,9 +241,20 @@ function fuseResultsRRF(
       const section = sectionsMap.get(id)!;
       return {
         ...section,
-        score: rrfScore, // Score RRF final
+        score: rrfScore, // Score RRF brut (sera normalisé ensuite)
       };
     });
+
+  // Normalise les scores entre 0-1 pour l'affichage
+  // Le meilleur résultat aura un score de 1.0
+  if (merged.length > 0) {
+    const maxScore = merged[0].score;
+    if (maxScore > 0) {
+      merged.forEach((item) => {
+        item.score = item.score / maxScore;
+      });
+    }
+  }
 
   return merged;
 }
