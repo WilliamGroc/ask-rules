@@ -111,7 +111,7 @@ export async function retrieveFromBestGame(
   query: string,
   topN = 4,
   minScore = 0.1,
-  options: Omit<RetrievalOptions, 'topN' | 'minScore'> = {},
+  options: Omit<RetrievalOptions, 'topN' | 'minScore'> = {}
 ): Promise<GameSelection | null> {
   // Si hybrid search activé, utilise la nouvelle implémentation
   if (options.useHybrid) {
@@ -135,7 +135,7 @@ export async function retrieveForGame(
   query: string,
   gameName: string,
   topN = 4,
-  options: Omit<RetrievalOptions, 'topN'> = {},
+  options: Omit<RetrievalOptions, 'topN'> = {}
 ): Promise<GameSelection | null> {
   // Résout le gameId depuis le nom
   const normalize = (s: string) =>
@@ -145,9 +145,7 @@ export async function retrieveForGame(
       .replace(/[\u0300-\u036f]/g, '');
   const needle = normalize(gameName);
 
-  const res = await pool.query<{ id: string; jeu: string }>(
-    'SELECT id, jeu FROM games',
-  );
+  const res = await pool.query<{ id: string; jeu: string }>('SELECT id, jeu FROM games');
   const match = res.rows.find((g) => normalize(g.jeu).includes(needle));
   if (!match) return null;
 
@@ -168,14 +166,7 @@ export async function retrieveForGame(
   // Sinon, mode dense
   const queryEmbedding = await generateEmbedding(query);
   const vectorLiteral = toVectorLiteral(queryEmbedding);
-  return searchWithinGame(
-    match.id,
-    match.jeu,
-    vectorLiteral,
-    topN,
-    0.01,
-    false,
-  );
+  return searchWithinGame(match.id, match.jeu, vectorLiteral, topN, 0.01, false);
 }
 
 // ── Implémentation Dense (Legacy) ─────────────────────────────────────────────
@@ -187,11 +178,11 @@ export async function retrieveForGame(
 async function _retrieveFromBestGameDense(
   query: string,
   topN = 4,
-  minScore = 0.1,
+  minScore = 0.1
 ): Promise<GameSelection | null> {
   // Vérifie qu'il y a des jeux en base
   const gamesRes = await pool.query<{ id: string; jeu: string }>(
-    'SELECT id, jeu FROM games ORDER BY jeu',
+    'SELECT id, jeu FROM games ORDER BY jeu'
   );
   if (gamesRes.rowCount === 0) return null;
 
@@ -225,7 +216,7 @@ async function _retrieveFromBestGameDense(
       vectorLiteral,
       topN,
       minScore,
-      matchedName,
+      matchedName
     );
   }
 
@@ -242,7 +233,7 @@ async function searchWithinGame(
   vectorLiteral: string,
   topN: number,
   minScore: number,
-  matchedName: boolean,
+  matchedName: boolean
 ): Promise<GameSelection | null> {
   const res = await pool.query(
     `SELECT s.id, s.game_id, g.jeu, s.titre, s.contenu, s.niveau,
@@ -256,7 +247,7 @@ async function searchWithinGame(
        AND 1 - (s.embedding <=> $1::vector) >= $3
      ORDER BY s.embedding <=> $1::vector
      LIMIT $4`,
-    [vectorLiteral, gameId, minScore, topN],
+    [vectorLiteral, gameId, minScore, topN]
   );
 
   if (res.rowCount === 0) return null;
@@ -275,7 +266,7 @@ async function selectBestGameByScore(
   games: Array<{ id: string; jeu: string }>,
   vectorLiteral: string,
   topN: number,
-  minScore: number,
+  minScore: number
 ): Promise<GameSelection | null> {
   // On récupère topN * 3 candidats pour avoir assez de données par jeu
   const limit = topN * games.length * 3;
@@ -291,7 +282,7 @@ async function selectBestGameByScore(
        AND 1 - (s.embedding <=> $1::vector) >= $2
      ORDER BY s.embedding <=> $1::vector
      LIMIT $3`,
-    [vectorLiteral, minScore, limit],
+    [vectorLiteral, minScore, limit]
   );
 
   if (res.rowCount === 0) return null;

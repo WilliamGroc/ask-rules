@@ -95,7 +95,7 @@ function normalizeQuery(query: string): string {
 async function searchDense(
   query: string,
   gameId: string | null,
-  topK: number,
+  topK: number
 ): Promise<ScoredSection[]> {
   const queryEmbedding = await generateEmbedding(query);
   const vectorLiteral = toVectorLiteral(queryEmbedding);
@@ -141,7 +141,7 @@ async function searchDense(
 async function searchSparse(
   query: string,
   gameId: string | null,
-  topK: number,
+  topK: number
 ): Promise<ScoredSection[]> {
   const tsQuery = normalizeQuery(query);
 
@@ -177,10 +177,7 @@ async function searchSparse(
   try {
     const res = await pool.query(sql, params);
     // Normalise les scores entre 0-1 (ts_rank_cd peut dépasser 1)
-    const maxScore = Math.max(
-      ...res.rows.map((r) => parseFloat(r.score ?? '0')),
-      0.001,
-    );
+    const maxScore = Math.max(...res.rows.map((r) => parseFloat(r.score ?? '0')), 0.001);
     return res.rows.map((row) => {
       const section = rowToScoredSection(row);
       section.score = section.score / maxScore; // Normalisation
@@ -211,7 +208,7 @@ async function searchSparse(
 function fuseResultsRRF(
   denseResults: ScoredSection[],
   sparseResults: ScoredSection[],
-  topN: number,
+  topN: number
 ): ScoredSection[] {
   // Map section_id -> score RRF
   const rrfScores = new Map<string, number>();
@@ -268,7 +265,7 @@ function fuseResultsRRF(
 function fuseResultsWeighted(
   denseResults: ScoredSection[],
   sparseResults: ScoredSection[],
-  topN: number,
+  topN: number
 ): ScoredSection[] {
   // Map section_id -> scores [dense, sparse]
   const scoresMap = new Map<string, [number, number]>();
@@ -292,8 +289,7 @@ function fuseResultsWeighted(
   // Calcule le score pondéré
   const merged = Array.from(scoresMap.entries())
     .map(([id, [denseScore, sparseScore]]) => {
-      const finalScore =
-        DENSE_WEIGHT * denseScore + SPARSE_WEIGHT * sparseScore;
+      const finalScore = DENSE_WEIGHT * denseScore + SPARSE_WEIGHT * sparseScore;
       const section = sectionsMap.get(id)!;
       return {
         ...section,
@@ -333,14 +329,9 @@ export interface HybridSearchOptions {
  */
 export async function hybridSearch(
   query: string,
-  options: HybridSearchOptions = {},
+  options: HybridSearchOptions = {}
 ): Promise<ScoredSection[]> {
-  const {
-    gameId = null,
-    topN = 4,
-    fusionMethod = 'rrf',
-    debug = false,
-  } = options;
+  const { gameId = null, topN = 4, fusionMethod = 'rrf', debug = false } = options;
 
   // 1. Recherche dense (embeddings)
   const denseResults = await searchDense(query, gameId, TOP_K_PER_SEARCH);
@@ -356,13 +347,13 @@ export async function hybridSearch(
       `  Top dense: ${denseResults
         .slice(0, 3)
         .map((r) => `${r.section.titre} (${r.score.toFixed(3)})`)
-        .join(', ')}`,
+        .join(', ')}`
     );
     console.log(
       `  Top sparse: ${sparseResults
         .slice(0, 3)
         .map((r) => `${r.section.titre} (${r.score.toFixed(3)})`)
-        .join(', ')}`,
+        .join(', ')}`
     );
   }
 
@@ -378,7 +369,7 @@ export async function hybridSearch(
       `  Top results: ${merged
         .slice(0, 3)
         .map((r) => `${r.section.titre} (${r.score.toFixed(3)})`)
-        .join(', ')}\n`,
+        .join(', ')}\n`
     );
   }
 
@@ -392,7 +383,7 @@ export async function hybridSearch(
 export async function hybridSearchForGame(
   query: string,
   gameId: string,
-  topN = 4,
+  topN = 4
 ): Promise<ScoredSection[]> {
   return hybridSearch(query, { gameId, topN });
 }
@@ -403,7 +394,7 @@ export async function hybridSearchForGame(
  */
 export async function hybridSearchBestGame(
   query: string,
-  topN = 4,
+  topN = 4
 ): Promise<{
   jeu: string;
   jeu_id: string;
@@ -417,10 +408,7 @@ export async function hybridSearchBestGame(
   if (allResults.length === 0) return null;
 
   // Agrège les scores par jeu
-  const gameScores = new Map<
-    string,
-    { total: number; sections: ScoredSection[] }
-  >();
+  const gameScores = new Map<string, { total: number; sections: ScoredSection[] }>();
 
   for (const result of allResults) {
     const gameId = result.jeu_id;
@@ -444,9 +432,7 @@ export async function hybridSearchBestGame(
   if (!bestGame) return null;
 
   const bestGameData = gameScores.get(bestGame)!;
-  const topSections = bestGameData.sections
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topN);
+  const topSections = bestGameData.sections.sort((a, b) => b.score - a.score).slice(0, topN);
 
   return {
     jeu: topSections[0].jeu,

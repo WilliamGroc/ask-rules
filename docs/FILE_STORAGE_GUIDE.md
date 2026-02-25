@@ -51,12 +51,12 @@ ask-rules/
 Sauvegarde un fichier uploadé dans le répertoire du jeu.
 
 ```typescript
-import { saveUploadedFile } from "./modules/fileStorage";
+import { saveUploadedFile } from './modules/fileStorage';
 
-const gameSlug = slugify("7 Wonders"); // "7-wonders"
+const gameSlug = slugify('7 Wonders'); // "7-wonders"
 const content = new Uint8Array(await file.arrayBuffer());
 
-const storedPath = saveUploadedFile(gameSlug, "regles.pdf", content);
+const storedPath = saveUploadedFile(gameSlug, 'regles.pdf', content);
 // Returns: "uploads/7-wonders/1709123456789_regles.pdf"
 ```
 
@@ -65,8 +65,8 @@ const storedPath = saveUploadedFile(gameSlug, "regles.pdf", content);
 Déplace un fichier temporaire vers le stockage permanent.
 
 ```typescript
-const tmpPath = "/tmp/ask-rules-123.pdf";
-const storedPath = moveToStorage(tmpPath, "7-wonders", "regles.pdf");
+const tmpPath = '/tmp/ask-rules-123.pdf';
+const storedPath = moveToStorage(tmpPath, '7-wonders', 'regles.pdf');
 ```
 
 #### `listGameFiles(gameSlug)`
@@ -74,7 +74,7 @@ const storedPath = moveToStorage(tmpPath, "7-wonders", "regles.pdf");
 Liste tous les fichiers d'un jeu.
 
 ```typescript
-const files = listGameFiles("7-wonders");
+const files = listGameFiles('7-wonders');
 // Returns: ["uploads/7-wonders/1709123456789_regles.pdf", ...]
 ```
 
@@ -83,7 +83,7 @@ const files = listGameFiles("7-wonders");
 Supprime tous les fichiers d'un jeu (appelé automatiquement lors de `removeGame()`).
 
 ```typescript
-deleteGameFiles("7-wonders");
+deleteGameFiles('7-wonders');
 // Supprime le répertoire uploads/7-wonders/ et son contenu
 ```
 
@@ -138,7 +138,7 @@ Supporte deux modes :
 #### Mode Fichier
 
 ```typescript
-const fichier = formData.get("fichier") as File;
+const fichier = formData.get('fichier') as File;
 const fileContent = new Uint8Array(await fichier.arrayBuffer());
 
 // Sauvegarde temporaire
@@ -202,8 +202,8 @@ Les fichiers uploadés ne sont **jamais committés** dans git.
 
 ```typescript
 const cleanFilename = originalFilename
-  .replace(/[^a-zA-Z0-9._-]/g, "_") // Caractères spéciaux → _
-  .replace(/_+/g, "_"); // Multiple _ → single _
+  .replace(/[^a-zA-Z0-9._-]/g, '_') // Caractères spéciaux → _
+  .replace(/_+/g, '_'); // Multiple _ → single _
 ```
 
 **Exemples** :
@@ -242,9 +242,9 @@ console.log(formatSize(getTotalStorageSize()));
 ### Lister les Fichiers d'un Jeu
 
 ```typescript
-import { listGameFiles } from "./modules/fileStorage";
+import { listGameFiles } from './modules/fileStorage';
 
-const files = listGameFiles("7-wonders");
+const files = listGameFiles('7-wonders');
 files.forEach((f) => console.log(f));
 // uploads/7-wonders/1709123456789_regles.pdf
 // uploads/7-wonders/1709567890123_errata.pdf
@@ -279,9 +279,9 @@ tar -xzf uploads-backup-20240224.tar.gz
 Si vous améliorez le pipeline NLP, vous pouvez réanalyser les fichiers existants :
 
 ```typescript
-import { listGameFiles, getAbsolutePath } from "./modules/fileStorage";
+import { listGameFiles, getAbsolutePath } from './modules/fileStorage';
 
-const files = listGameFiles("7-wonders");
+const files = listGameFiles('7-wonders');
 for (const relativePath of files) {
   const absolutePath = getAbsolutePath(relativePath);
   const result = await analyseFile(absolutePath, { withChunking: true });
@@ -292,8 +292,8 @@ for (const relativePath of files) {
 ### 2. Export/Backup Complet
 
 ```typescript
-import { getTotalStorageSize, formatSize } from "./modules/fileStorage";
-import { listGames } from "./modules/knowledgeBase";
+import { getTotalStorageSize, formatSize } from './modules/fileStorage';
+import { listGames } from './modules/knowledgeBase';
 
 const games = await listGames();
 const totalSize = getTotalStorageSize();
@@ -307,14 +307,14 @@ const manifest = games.map((g) => ({
   name: g.jeu,
   file: g.fichier,
 }));
-fs.writeFileSync("manifest.json", JSON.stringify(manifest, null, 2));
+fs.writeFileSync('manifest.json', JSON.stringify(manifest, null, 2));
 ```
 
 ### 3. Vérification d'Intégrité
 
 ```typescript
-import { fileExists } from "./modules/fileStorage";
-import { listGames } from "./modules/knowledgeBase";
+import { fileExists } from './modules/fileStorage';
+import { listGames } from './modules/knowledgeBase';
 
 const games = await listGames();
 const missing = games.filter((g) => !fileExists(g.fichier));
@@ -358,7 +358,7 @@ UPLOADS_DIR=/var/lib/ask-rules/uploads
 // Modifier getGameUploadDir() pour inclure la date
 export function getGameUploadDir(gameSlug: string): string {
   const year = new Date().getFullYear();
-  const month = String(new Date().getMonth() + 1).padStart(2, "0");
+  const month = String(new Date().getMonth() + 1).padStart(2, '0');
   const gameDir = path.join(UPLOADS_DIR, `${year}-${month}`, gameSlug);
   // ...
 }
@@ -409,25 +409,21 @@ ls uploads/  # Ne devrait plus contenir 7-wonders/
 
 ```typescript
 // test-file-storage.ts
-import {
-  saveUploadedFile,
-  listGameFiles,
-  deleteGameFiles,
-} from "./src/modules/fileStorage";
+import { saveUploadedFile, listGameFiles, deleteGameFiles } from './src/modules/fileStorage';
 
-const testContent = Buffer.from("Test content");
-const path1 = saveUploadedFile("test-game", "file1.txt", testContent);
-const path2 = saveUploadedFile("test-game", "file2.txt", testContent);
+const testContent = Buffer.from('Test content');
+const path1 = saveUploadedFile('test-game', 'file1.txt', testContent);
+const path2 = saveUploadedFile('test-game', 'file2.txt', testContent);
 
-console.log("Saved:", path1, path2);
+console.log('Saved:', path1, path2);
 
-const files = listGameFiles("test-game");
-console.log("Files:", files);
+const files = listGameFiles('test-game');
+console.log('Files:', files);
 // Expected: 2 files
 
-deleteGameFiles("test-game");
-const filesAfter = listGameFiles("test-game");
-console.log("Files after delete:", filesAfter);
+deleteGameFiles('test-game');
+const filesAfter = listGameFiles('test-game');
+console.log('Files after delete:', filesAfter);
 // Expected: 0 files
 ```
 
@@ -464,13 +460,13 @@ chmod 755 uploads/
 
 ```typescript
 // Nettoyage des orphelins
-import { listGameFiles } from "./modules/fileStorage";
-import { gameExists } from "./modules/knowledgeBase";
-import fs from "fs";
+import { listGameFiles } from './modules/fileStorage';
+import { gameExists } from './modules/knowledgeBase';
+import fs from 'fs';
 
-const dirs = fs.readdirSync("uploads");
+const dirs = fs.readdirSync('uploads');
 for (const dir of dirs) {
-  if (dir === ".gitkeep") continue;
+  if (dir === '.gitkeep') continue;
   const exists = await gameExists(dir);
   if (!exists) {
     console.log(`Cleaning orphan: ${dir}`);

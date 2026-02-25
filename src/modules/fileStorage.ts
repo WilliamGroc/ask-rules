@@ -13,9 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /** Répertoire racine pour tous les uploads */
-const UPLOADS_DIR = path.resolve(
-  process.env.UPLOADS_DIR ?? path.join(process.cwd(), 'uploads'),
-);
+const UPLOADS_DIR = path.resolve(process.env['UPLOADS_DIR'] ?? path.join(process.cwd(), 'uploads'));
 
 /**
  * Initialise le répertoire uploads s'il n'existe pas.
@@ -49,15 +47,13 @@ export function getGameUploadDir(gameSlug: string): string {
 export function saveUploadedFile(
   gameSlug: string,
   originalFilename: string,
-  content: Buffer | Uint8Array,
+  content: Buffer | Uint8Array
 ): string {
   ensureUploadsDir();
   const gameDir = getGameUploadDir(gameSlug);
 
   // Nettoie le nom de fichier original (supprime caractères spéciaux)
-  const cleanFilename = originalFilename
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_');
+  const cleanFilename = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_');
 
   // Ajoute un timestamp pour éviter les collisions
   const timestamp = Date.now();
@@ -78,11 +74,7 @@ export function saveUploadedFile(
  * @param originalFilename - Nom du fichier original
  * @returns Chemin relatif du fichier sauvegardé
  */
-export function moveToStorage(
-  tmpPath: string,
-  gameSlug: string,
-  originalFilename: string,
-): string {
+export function moveToStorage(tmpPath: string, gameSlug: string, originalFilename: string): string {
   const content = fs.readFileSync(tmpPath);
   return saveUploadedFile(gameSlug, originalFilename, content);
 }
@@ -167,7 +159,6 @@ export function getTotalStorageSize(): number {
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }

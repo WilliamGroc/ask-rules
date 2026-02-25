@@ -10,9 +10,10 @@
     "migrate": "tsx src/migrate.ts",
     "build": "tsc --project tsconfig.node.json",
     "start:dist": "node dist/index.js",
-    "lint": "biome lint",
-    "lint:fix": "biome lint --write",
-    "format": "biome format --write"
+    "lint": "eslint . && svelte-check",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [
     "nlp",
@@ -39,13 +40,19 @@
     "svelte": "5.53.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.4",
     "@types/node": "22.0.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "8.16.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "eslint": "^10.0.2",
+    "eslint-plugin-svelte": "^3.15.0",
+    "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.5.0",
     "svelte-check": "4.4.3",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
+    "typescript-eslint": "^8.56.1",
     "vite": "6.4.1"
   }
 }

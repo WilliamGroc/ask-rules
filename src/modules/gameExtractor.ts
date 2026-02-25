@@ -33,7 +33,7 @@ export function extractPlayerCount(text: string): {
   // Plage : "2 à 5 joueurs" ou "3-6 joueurs"
   const rangeMatch = firstMatch(
     text,
-    /(\d+)\s*(?:à|au?|[-–])\s*(\d+)\s*(?:joueurs?|participants?|personnes?)/i,
+    /(\d+)\s*(?:à|au?|[-–])\s*(\d+)\s*(?:joueurs?|participants?|personnes?)/i
   );
   if (rangeMatch) {
     return {
@@ -45,7 +45,7 @@ export function extractPlayerCount(text: string): {
   // Valeur unique : "pour 2 joueurs"
   const singleMatch = firstMatch(
     text,
-    /(?:pour|de|avec)\s+(\d+)\s+(?:joueurs?|participants?|personnes?)/i,
+    /(?:pour|de|avec)\s+(\d+)\s+(?:joueurs?|participants?|personnes?)/i
   );
   if (singleMatch) {
     const n = parseInt(singleMatch[1], 10);
@@ -89,10 +89,7 @@ export function extractDuration(text: string): {
   max: number | null;
 } {
   // "30 à 90 minutes" ou "30-90 min"
-  const minRangeMatch = firstMatch(
-    text,
-    /(\d+)\s*(?:à|[-–])\s*(\d+)\s*min(?:utes?)?/i,
-  );
+  const minRangeMatch = firstMatch(text, /(\d+)\s*(?:à|[-–])\s*(\d+)\s*min(?:utes?)?/i);
   if (minRangeMatch) {
     return {
       min: parseInt(minRangeMatch[1], 10),
@@ -119,9 +116,7 @@ export function extractDuration(text: string): {
   // "1h30" ou "2h"
   const hourMatch = firstMatch(text, /(\d+)h(?:(\d+))?/i);
   if (hourMatch) {
-    const n =
-      parseInt(hourMatch[1], 10) * 60 +
-      (hourMatch[2] ? parseInt(hourMatch[2], 10) : 0);
+    const n = parseInt(hourMatch[1], 10) * 60 + (hourMatch[2] ? parseInt(hourMatch[2], 10) : 0);
     return { min: n, max: n };
   }
 
@@ -141,11 +136,7 @@ export function extractGameName(text: string): string {
     .filter(Boolean);
   for (const line of lines) {
     // Ignore les lignes trop courtes, purement numériques ou avec des URLs
-    if (
-      line.length >= 3 &&
-      !/^[\d.]+$/.test(line) &&
-      !/https?:\/\//.test(line)
-    ) {
+    if (line.length >= 3 && !/^[\d.]+$/.test(line) && !/https?:\/\//.test(line)) {
       return line;
     }
   }

@@ -264,9 +264,7 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
 
   // 4. "Titre :" heuristique
   //    Conditions : ≤ 6 mots, ne commence pas par article/pronom/verbe, pas de virgule interne
-  const titreColonMatch = trimmed.match(
-    /^([A-ZÀÂÉÈÊËÎÏÔÙÛÜ][^.!?\n]{2,60})\s*:\s*$/,
-  );
+  const titreColonMatch = trimmed.match(/^([A-ZÀÂÉÈÊËÎÏÔÙÛÜ][^.!?\n]{2,60})\s*:\s*$/);
   if (titreColonMatch) {
     const candidate = titreColonMatch[1].trim();
     const wc = wordCount(candidate);
@@ -362,9 +360,7 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
  *
  * Retourne null si les conditions ne sont pas remplies.
  */
-function splitInlineTitleLine(
-  line: string,
-): { title: string; content: string } | null {
+function splitInlineTitleLine(line: string): { title: string; content: string } | null {
   const sepIdx = line.indexOf(' : ');
   if (sepIdx < 0) return null;
 
@@ -414,44 +410,34 @@ export function classifySection(titre: string, contenu = ''): GameSectionType {
 
   if (
     /materiel|composant|contenu.?boite|piece|hex|tuile|plateau/.test(t) ||
-    /dans la boite|contient\s*:|\bx\d|\d\s*x\s*(carte|jeton|tuile|pion|cube)/.test(
-      c,
-    )
+    /dans la boite|contient\s*:|\bx\d|\d\s*x\s*(carte|jeton|tuile|pion|cube)/.test(c)
   )
     return 'materiel';
 
   if (
     /mise.?en.?place|preparation|demarrage|avant.?partie|setup/.test(t) ||
-    /avant le premier tour|pour commencer|pour preparer|placez le plateau/.test(
-      c,
-    )
+    /avant le premier tour|pour commencer|pour preparer|placez le plateau/.test(c)
   )
     return 'preparation';
 
   if (
     /tour.?de.?jeu|deroulement|phase|action|recrut|construir|attaqu|commerc|passer|mecanique/.test(
-      t,
+      t
     ) ||
-    /a son tour|pendant son tour|le joueur actif|chaque joueur (peut|doit)/.test(
-      c,
-    )
+    /a son tour|pendant son tour|le joueur actif|chaque joueur (peut|doit)/.test(c)
   )
     return 'tour_de_jeu';
 
   if (/carte.?evenement|evenement/.test(t)) return 'cartes_evenement';
 
   if (
-    /regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(
-      t,
-    )
+    /regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(t)
   )
     return 'regles_speciales';
 
   if (
     /condition.?victoire|fin.?partie|decompte|score|gagnant|victoire/.test(t) ||
-    /la partie se termine|decompte final|calculez les points|comptez les points/.test(
-      c,
-    )
+    /la partie se termine|decompte final|calculez les points|comptez les points/.test(c)
   )
     return 'victoire';
 
@@ -476,10 +462,7 @@ export function classifySection(titre: string, contenu = ''): GameSectionType {
  * @param rawText      - Texte extrait du fichier (PDF ou TXT)
  * @param documentName - Nom du document (titre de la section racine)
  */
-export function parseSections(
-  rawText: string,
-  documentName = 'Jeu',
-): RawSection[] {
+export function parseSections(rawText: string, documentName = 'Jeu'): RawSection[] {
   const rawLines = rawText.split(/\r?\n/);
 
   // ── Phase 1 : Parsing ligne par ligne ────────────────────────────────────────
@@ -617,10 +600,7 @@ export function parseSections(
 
     const emitChunk = () => {
       if (chunkParagraphs.length === 0) return;
-      const titre =
-        chunkIndex === 0
-          ? section.titre
-          : `${section.titre} (suite ${chunkIndex})`;
+      const titre = chunkIndex === 0 ? section.titre : `${section.titre} (suite ${chunkIndex})`;
       result.push({
         titre,
         contenu: chunkParagraphs.join('\n\n'),
@@ -633,10 +613,7 @@ export function parseSections(
     for (const para of paragraphs) {
       const paraWords = wordCount(para);
 
-      if (
-        chunkWords + paraWords > CHUNK_TARGET_WORDS &&
-        chunkParagraphs.length > 0
-      ) {
+      if (chunkWords + paraWords > CHUNK_TARGET_WORDS && chunkParagraphs.length > 0) {
         emitChunk();
         // Overlap : conserver le dernier paragraphe du chunk pour le contexte
         const overlap = chunkParagraphs[chunkParagraphs.length - 1] ?? '';

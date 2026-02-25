@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { enhance } from "$app/forms";
-  import type { PageData } from "./$types";
-  import type { GameSectionType } from "../types";
+  import { enhance } from '$app/forms';
+  import type { PageData } from './$types';
+  import type { GameSectionType } from '../types';
 
   export let data: PageData;
   export let form:
@@ -31,30 +31,28 @@
     | null;
 
   let isLoading = false;
-  let selectedGame = "";
-  let lastQuestion = "";
+  let selectedGame = '';
+  let lastQuestion = '';
   let formEl: HTMLFormElement;
 
   const suggestedQuestions = [
-    "Comment jouer ?",
-    "Comment gagner ?",
-    "Comment se déroule un tour ?",
-    "Comment se déroule un combat ?",
-    "Quelle est la mise en place ?",
-    "Quelles sont les actions disponibles ?",
+    'Comment jouer ?',
+    'Comment gagner ?',
+    'Comment se déroule un tour ?',
+    'Comment se déroule un combat ?',
+    'Quelle est la mise en place ?',
+    'Quelles sont les actions disponibles ?',
   ];
 
   function handleTextareaKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       formEl.requestSubmit();
     }
   }
 
   function fillQuestion(question: string) {
-    const textarea = formEl.querySelector(
-      'textarea[name="question"]',
-    ) as HTMLTextAreaElement;
+    const textarea = formEl.querySelector('textarea[name="question"]') as HTMLTextAreaElement;
     if (textarea) {
       textarea.value = question;
       textarea.focus();
@@ -64,10 +62,7 @@
 
 <svelte:head>
   <title>Ask Rules — Règles de jeu de société</title>
-  <meta
-    name="description"
-    content="Posez des questions sur vos règles de jeu indexées."
-  />
+  <meta name="description" content="Posez des questions sur vos règles de jeu indexées." />
 </svelte:head>
 
 <div class="page">
@@ -85,10 +80,8 @@
     use:enhance={() => {
       isLoading = true;
       const savedGame = selectedGame;
-      const textarea = formEl.querySelector(
-        'textarea[name="question"]',
-      ) as HTMLTextAreaElement;
-      const savedQuestion = textarea?.value ?? "";
+      const textarea = formEl.querySelector('textarea[name="question"]') as HTMLTextAreaElement;
+      const savedQuestion = textarea?.value ?? '';
       return async ({ update }) => {
         await update();
         selectedGame = savedGame;
@@ -122,12 +115,7 @@
 
     <div class="form-footer">
       {#if data.games.length > 1}
-        <select
-          name="jeu"
-          class="game-select"
-          disabled={isLoading}
-          bind:value={selectedGame}
-        >
+        <select name="jeu" class="game-select" disabled={isLoading} bind:value={selectedGame}>
           <option value="">Sélection automatique</option>
           {#each data.games as g}
             <option value={g.jeu}>{g.jeu}</option>
@@ -187,8 +175,7 @@
               <span class="file-text">
                 <span class="file-label">Fichier source</span>
                 <span class="file-name"
-                  >{form.fichier.split("/").pop()?.replace(/^\d+_/, "") ||
-                    "Télécharger"}</span
+                  >{form.fichier.split('/').pop()?.replace(/^\d+_/, '') || 'Télécharger'}</span
                 >
               </span>
               <span class="file-arrow">↓</span>
@@ -216,7 +203,7 @@
         <!-- Sections source -->
         <details class="sources-details">
           <summary class="sources-summary">
-            {form.sections.length} section{form.sections.length > 1 ? "s" : ""} source
+            {form.sections.length} section{form.sections.length > 1 ? 's' : ''} source
           </summary>
           <div class="sources-list">
             {#each form.sections as s}
@@ -226,19 +213,16 @@
                   <div class="source-meta">
                     {#if s.page_debut}
                       <span class="source-page">
-                        p.{s.page_debut}{s.page_fin &&
-                        s.page_fin !== s.page_debut
+                        p.{s.page_debut}{s.page_fin && s.page_fin !== s.page_debut
                           ? `–${s.page_fin}`
-                          : ""}
+                          : ''}
                       </span>
                     {/if}
-                    <span class="source-score"
-                      >{(s.score * 100).toFixed(0)}%</span
-                    >
+                    <span class="source-score">{(s.score * 100).toFixed(0)}%</span>
                   </div>
                 </div>
                 <p class="source-text">
-                  {s.resume || s.contenu.slice(0, 220) + "…"}
+                  {s.resume || s.contenu.slice(0, 220) + '…'}
                 </p>
               </div>
             {/each}
@@ -252,10 +236,9 @@
   <footer class="footer">
     {#if data.games.length > 0}
       <span
-        >{data.games.length} jeu{data.games.length > 1 ? "x" : ""} indexé{data
-          .games.length > 1
-          ? "s"
-          : ""}</span
+        >{data.games.length} jeu{data.games.length > 1 ? 'x' : ''} indexé{data.games.length > 1
+          ? 's'
+          : ''}</span
       >
     {/if}
   </footer>

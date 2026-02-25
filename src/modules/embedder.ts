@@ -34,12 +34,12 @@ async function getExtractor(): Promise<any> {
       } catch {
         throw new Error(
           'La bibliothèque "@huggingface/transformers" n\'est pas installée.\n' +
-            'Exécutez : pnpm add @huggingface/transformers',
+            'Exécutez : pnpm add @huggingface/transformers'
         );
       }
 
       // @huggingface/transformers v3 n'utilise pas XDG_CACHE_HOME nativement.
-      const cacheDir = process.env.XDG_CACHE_HOME;
+      const cacheDir = process.env['XDG_CACHE_HOME'];
       if (cacheDir) {
         (mod as any).env.cacheDir = cacheDir;
       }
@@ -49,7 +49,7 @@ async function getExtractor(): Promise<any> {
       extractorInstance = await pipeline(
         'feature-extraction',
         'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-        { dtype: 'q8' },
+        { dtype: 'q8' }
       );
       return extractorInstance;
     })();
@@ -75,9 +75,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     return data;
   } catch (err) {
     console.error("Erreur lors de la génération de l'embedding :", err);
-    throw new Error(
-      "Échec de la génération de l'embedding. Voir les logs pour plus de détails.",
-    );
+    throw new Error("Échec de la génération de l'embedding. Voir les logs pour plus de détails.");
   }
 }
 
@@ -107,9 +105,7 @@ export async function generateEmbeddingForSection(section: {
     }
 
     if (section.total_chunks && section.total_chunks > 1) {
-      parts.push(
-        `(Partie ${(section.chunk_index ?? 0) + 1}/${section.total_chunks})`,
-      );
+      parts.push(`(Partie ${(section.chunk_index ?? 0) + 1}/${section.total_chunks})`);
     }
 
     parts.push('');

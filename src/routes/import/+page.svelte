@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { PageData } from "./$types";
+  import type { PageData } from './$types';
 
   export let data: PageData;
 
   // ── État du formulaire ──────────────────────────────────────────────────────
   let isLoading = false;
-  let selectedGame = "";
-  let gameNameValue = "";
-  let importMode: "file" | "url" = "file";
+  let selectedGame = '';
+  let gameNameValue = '';
+  let importMode: 'file' | 'url' = 'file';
 
   function onGameSelect(e: Event) {
     const select = e.target as HTMLSelectElement;
@@ -46,28 +46,27 @@
     const formData = new FormData(form);
 
     try {
-      const response = await fetch("/import/stream", {
-        method: "POST",
+      const response = await fetch('/import/stream', {
+        method: 'POST',
         body: formData,
       });
 
-      if (!response.body)
-        throw new Error(`Erreur serveur (${response.status})`);
+      if (!response.body) throw new Error(`Erreur serveur (${response.status})`);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
+          if (!line.startsWith('data: ')) continue;
           let evt: Record<string, unknown>;
           try {
             evt = JSON.parse(line.slice(6));
@@ -75,16 +74,16 @@
             continue;
           }
 
-          if (evt.type === "step") {
+          if (evt.type === 'step') {
             steps = [...steps, { message: evt.message as string }];
-          } else if (evt.type === "embedding_start") {
+          } else if (evt.type === 'embedding_start') {
             embedding = { current: 0, total: evt.total as number };
-          } else if (evt.type === "embedding_progress") {
+          } else if (evt.type === 'embedding_progress') {
             embedding = {
               current: evt.current as number,
               total: evt.total as number,
             };
-          } else if (evt.type === "done") {
+          } else if (evt.type === 'done') {
             embedding = null;
             result = {
               ok: true,
@@ -93,7 +92,7 @@
               action: evt.action as string,
               mecaniques: evt.mecaniques as string[],
             };
-          } else if (evt.type === "error") {
+          } else if (evt.type === 'error') {
             result = { ok: false, error: evt.message as string };
           }
         }
@@ -111,33 +110,21 @@
 
 <svelte:head>
   <title>Ask Rules — Importer des règles</title>
-  <meta
-    name="description"
-    content="Importez un fichier de règles de jeu de société."
-  />
+  <meta name="description" content="Importez un fichier de règles de jeu de société." />
 </svelte:head>
 
 <div class="page">
   <!-- En-tête -->
   <header class="header">
     <h1 class="logo">Importer des règles</h1>
-    <p class="tagline">
-      Ajoutez un fichier .txt ou .pdf à la base de connaissance
-    </p>
+    <p class="tagline">Ajoutez un fichier .txt ou .pdf à la base de connaissance</p>
   </header>
 
   <!-- Formulaire -->
-  <form
-    method="POST"
-    enctype="multipart/form-data"
-    class="import-form"
-    on:submit={handleSubmit}
-  >
+  <form method="POST" enctype="multipart/form-data" class="import-form" on:submit={handleSubmit}>
     <!-- Nom du jeu -->
     <div class="form-group">
-      <label class="form-label" for="gameName"
-        >Nom du jeu <span class="required">*</span></label
-      >
+      <label class="form-label" for="gameName">Nom du jeu <span class="required">*</span></label>
       <input
         id="gameName"
         name="gameName"
@@ -156,12 +143,7 @@
           Mettre à jour un jeu existant
           <span class="form-hint">optionnel — pré-remplit le nom</span>
         </label>
-        <select
-          id="existingGame"
-          class="game-select"
-          disabled={isLoading}
-          on:change={onGameSelect}
-        >
+        <select id="existingGame" class="game-select" disabled={isLoading} on:change={onGameSelect}>
           <option value="">— Nouveau jeu —</option>
           {#each data.games as g}
             <option value={g.id}>{g.jeu}</option>
@@ -175,27 +157,14 @@
           <span class="form-label">Mode d'import</span>
           <div class="radio-group">
             <label class="radio-label">
-              <input
-                type="radio"
-                name="mode"
-                value="replace"
-                checked
-                disabled={isLoading}
-              />
+              <input type="radio" name="mode" value="replace" checked disabled={isLoading} />
               <span class="radio-text">
                 <strong>Remplacer</strong>
-                <span class="radio-hint"
-                  >Efface les sections existantes et les remplace</span
-                >
+                <span class="radio-hint">Efface les sections existantes et les remplace</span>
               </span>
             </label>
             <label class="radio-label">
-              <input
-                type="radio"
-                name="mode"
-                value="merge"
-                disabled={isLoading}
-              />
+              <input type="radio" name="mode" value="merge" disabled={isLoading} />
               <span class="radio-text">
                 <strong>Fusionner</strong>
                 <span class="radio-hint"
@@ -221,19 +190,19 @@
           type="button"
           class="import-tab{importMode === 'file' ? ' active' : ''}"
           disabled={isLoading}
-          on:click={() => (importMode = "file")}>Fichier</button
+          on:click={() => (importMode = 'file')}>Fichier</button
         >
         <button
           type="button"
           class="import-tab{importMode === 'url' ? ' active' : ''}"
           disabled={isLoading}
-          on:click={() => (importMode = "url")}>URL</button
+          on:click={() => (importMode = 'url')}>URL</button
         >
       </div>
 
       <input type="hidden" name="importMode" value={importMode} />
 
-      {#if importMode === "file"}
+      {#if importMode === 'file'}
         <div class="file-input-wrapper">
           <input
             id="fichier"
@@ -254,18 +223,13 @@
           placeholder="https://exemple.com/regles.pdf  ou  https://exemple.com/faq"
           disabled={isLoading}
         />
-        <span class="form-hint">PDF, page HTML (FAQ) ou fichier texte brut</span
-        >
+        <span class="form-hint">PDF, page HTML (FAQ) ou fichier texte brut</span>
       {/if}
     </div>
 
     <!-- Bouton -->
     <div class="form-actions">
-      <button
-        type="submit"
-        class="submit-btn{isLoading ? ' loading' : ''}"
-        disabled={isLoading}
-      >
+      <button type="submit" class="submit-btn{isLoading ? ' loading' : ''}" disabled={isLoading}>
         {#if isLoading}
           <span class="spinner" aria-hidden="true"></span>Indexation en cours…
         {:else}
@@ -295,9 +259,7 @@
         <div class="progress-bar-wrapper">
           <div class="progress-bar-label">
             <span>Génération des embeddings</span>
-            <span class="progress-bar-count"
-              >{embedding.current} / {embedding.total}</span
-            >
+            <span class="progress-bar-count">{embedding.current} / {embedding.total}</span>
           </div>
           <div
             class="progress-bar-track"
@@ -336,10 +298,10 @@
               <div class="success-row">
                 <span class="success-key">Sections</span>
                 <span class="success-val"
-                  >{result.sections} section{result.sections > 1 ? "s" : ""} indexée{result.sections >
+                  >{result.sections} section{result.sections > 1 ? 's' : ''} indexée{result.sections >
                   1
-                    ? "s"
-                    : ""}</span
+                    ? 's'
+                    : ''}</span
                 >
               </div>
               <div class="success-row">
@@ -349,8 +311,7 @@
               {#if result.mecaniques && result.mecaniques.length > 0}
                 <div class="success-row">
                   <span class="success-key">Mécaniques</span>
-                  <span class="success-val">{result.mecaniques.join(", ")}</span
-                  >
+                  <span class="success-val">{result.mecaniques.join(', ')}</span>
                 </div>
               {/if}
             </div>
@@ -364,10 +325,9 @@
   <footer class="footer">
     {#if data.games.length > 0}
       <span
-        >{data.games.length} jeu{data.games.length > 1 ? "x" : ""} indexé{data
-          .games.length > 1
-          ? "s"
-          : ""} dans la base</span
+        >{data.games.length} jeu{data.games.length > 1 ? 'x' : ''} indexé{data.games.length > 1
+          ? 's'
+          : ''} dans la base</span
       >
     {:else}
       <span>Base vide — importez votre premier jeu</span>

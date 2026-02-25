@@ -7,12 +7,7 @@
  */
 
 import { deleteGameFiles } from './fileStorage';
-import type {
-  KnowledgeBaseEntry,
-  StoredSection,
-  GameMetadata,
-  Statistics,
-} from '../types';
+import type { KnowledgeBaseEntry, StoredSection, GameMetadata, Statistics } from '../types';
 import pool from './db';
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
@@ -59,7 +54,7 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
         entry.date_ajout,
         JSON.stringify(entry.metadata),
         JSON.stringify(entry.statistiques),
-      ],
+      ]
     );
 
     // Supprime les sections existantes (ON DELETE CASCADE ne suffit pas ici
@@ -96,7 +91,7 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
           section.hierarchy_path ?? '',
           section.chunk_index ?? 0,
           section.total_chunks ?? 1,
-        ],
+        ]
       );
     }
 
@@ -117,10 +112,7 @@ export async function gameExists(id: string): Promise<boolean> {
 
 /** Retourne le nombre de sections actuellement indexées pour un jeu. */
 export async function countSections(gameId: string): Promise<number> {
-  const res = await pool.query(
-    'SELECT COUNT(*) AS nb FROM sections WHERE game_id = $1',
-    [gameId],
-  );
+  const res = await pool.query('SELECT COUNT(*) AS nb FROM sections WHERE game_id = $1', [gameId]);
   return parseInt(res.rows[0].nb, 10);
 }
 
@@ -136,10 +128,10 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
     await client.query('BEGIN');
 
     // Ajoute le nouveau fichier à la liste des sources
-    await client.query(
-      `UPDATE games SET fichier = fichier || ' + ' || $1 WHERE id = $2`,
-      [entry.fichier, entry.id],
-    );
+    await client.query(`UPDATE games SET fichier = fichier || ' + ' || $1 WHERE id = $2`, [
+      entry.fichier,
+      entry.id,
+    ]);
 
     // Insère les nouvelles sections (IDs déjà décalés par l'offset)
     for (const section of entry.sections) {
@@ -171,7 +163,7 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
           section.hierarchy_path ?? '',
           section.chunk_index ?? 0,
           section.total_chunks ?? 1,
-        ],
+        ]
       );
     }
 
@@ -203,11 +195,8 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
  */
 export async function openSectionWriter(
   gameId: string,
-  meta: Pick<
-    KnowledgeBaseEntry,
-    'jeu' | 'fichier' | 'date_ajout' | 'metadata' | 'statistiques'
-  >,
-  isMerge: boolean,
+  meta: Pick<KnowledgeBaseEntry, 'jeu' | 'fichier' | 'date_ajout' | 'metadata' | 'statistiques'>,
+  isMerge: boolean
 ): Promise<{
   insertSection(section: StoredSection): Promise<void>;
   commit(): Promise<void>;
@@ -217,10 +206,10 @@ export async function openSectionWriter(
   await client.query('BEGIN');
 
   if (isMerge) {
-    await client.query(
-      `UPDATE games SET fichier = fichier || ' + ' || $1 WHERE id = $2`,
-      [meta.fichier, gameId],
-    );
+    await client.query(`UPDATE games SET fichier = fichier || ' + ' || $1 WHERE id = $2`, [
+      meta.fichier,
+      gameId,
+    ]);
   } else {
     await client.query(
       `INSERT INTO games (id, jeu, fichier, date_ajout, metadata, statistiques)
@@ -237,7 +226,7 @@ export async function openSectionWriter(
         meta.date_ajout,
         JSON.stringify(meta.metadata),
         JSON.stringify(meta.statistiques),
-      ],
+      ]
     );
     await client.query('DELETE FROM sections WHERE game_id = $1', [gameId]);
   }
@@ -271,7 +260,7 @@ export async function openSectionWriter(
           section.hierarchy_path ?? '',
           section.chunk_index ?? 0,
           section.total_chunks ?? 1,
-        ],
+        ]
       );
     },
     async commit() {
@@ -286,13 +275,11 @@ export async function openSectionWriter(
 }
 
 /** Trouve un jeu par son identifiant ou son chemin de fichier. */
-export async function findGame(
-  idOrPath: string,
-): Promise<KnowledgeBaseEntry | null> {
-  const res = await pool.query(
-    'SELECT * FROM games WHERE id = $1 OR fichier = $2',
-    [idOrPath, idOrPath],
-  );
+export async function findGame(idOrPath: string): Promise<KnowledgeBaseEntry | null> {
+  const res = await pool.query('SELECT * FROM games WHERE id = $1 OR fichier = $2', [
+    idOrPath,
+    idOrPath,
+  ]);
   if (res.rowCount === 0) return null;
 
   const row = res.rows[0];
@@ -317,12 +304,8 @@ export async function removeGame(id: string): Promise<void> {
 }
 
 /** Retourne la liste de tous les jeux (sans leurs sections). */
-export async function listGames(): Promise<
-  Array<{ id: string; jeu: string; fichier: string }>
-> {
-  const res = await pool.query(
-    'SELECT id, jeu, fichier FROM games ORDER BY jeu',
-  );
+export async function listGames(): Promise<Array<{ id: string; jeu: string; fichier: string }>> {
+  const res = await pool.query('SELECT id, jeu, fichier FROM games ORDER BY jeu');
   return res.rows;
 }
 
@@ -336,10 +319,7 @@ export async function summarizeKB(): Promise<string> {
 // ── Chargement des sections ───────────────────────────────────────────────────
 
 async function loadSections(gameId: string): Promise<StoredSection[]> {
-  const res = await pool.query(
-    'SELECT * FROM sections WHERE game_id = $1 ORDER BY id',
-    [gameId],
-  );
+  const res = await pool.query('SELECT * FROM sections WHERE game_id = $1 ORDER BY id', [gameId]);
   return res.rows.map(rowToStoredSection);
 }
 

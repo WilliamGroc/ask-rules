@@ -69,9 +69,7 @@ function htmlToText(html: string): string {
  * Retourne le chemin du fichier temporaire et le nom de fichier dérivé de l'URL.
  * L'appelant est responsable de supprimer le fichier temporaire.
  */
-async function fetchUrlToTemp(
-  url: string,
-): Promise<{ tmpPath: string; filename: string }> {
+async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename: string }> {
   const parsed = new URL(url);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('Seules les URLs http:// et https:// sont supportées.');
@@ -83,9 +81,7 @@ async function fetchUrlToTemp(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Le serveur a répondu ${response.status} — ${response.statusText}`,
-    );
+    throw new Error(`Le serveur a répondu ${response.status} — ${response.statusText}`);
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -98,11 +94,7 @@ async function fetchUrlToTemp(
   if (isPdf) {
     ext = '.pdf';
     content = Buffer.from(await response.arrayBuffer());
-  } else if (
-    contentType.includes('text/html') ||
-    urlExt === '.html' ||
-    urlExt === '.htm'
-  ) {
+  } else if (contentType.includes('text/html') || urlExt === '.html' || urlExt === '.htm') {
     ext = '.txt';
     content = Buffer.from(htmlToText(await response.text()), 'utf-8');
   } else {
@@ -114,8 +106,7 @@ async function fetchUrlToTemp(
   fs.writeFileSync(tmpPath, new Uint8Array(content));
 
   // Nom de fichier lisible : chemin URL ou hostname
-  const basename =
-    path.basename(parsed.pathname).replace(/[?#].*$/, '') || parsed.hostname;
+  const basename = path.basename(parsed.pathname).replace(/[?#].*$/, '') || parsed.hostname;
   const filename = basename.endsWith(ext) ? basename : basename + ext;
 
   return { tmpPath, filename };
@@ -137,12 +128,8 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         const formData = await request.formData();
         const gameName = String(formData.get('gameName') ?? '').trim();
-        const mode = String(formData.get('mode') ?? 'replace') as
-          | 'replace'
-          | 'merge';
-        const importMode = String(formData.get('importMode') ?? 'file') as
-          | 'file'
-          | 'url';
+        const mode = String(formData.get('mode') ?? 'replace') as 'replace' | 'merge';
+        const importMode = String(formData.get('importMode') ?? 'file') as 'file' | 'url';
 
         const gameSlug = slugify(gameName);
         let sourceFilename = '';
@@ -178,16 +165,11 @@ export const POST: RequestHandler = async ({ request }) => {
             type: 'step',
             message: `Téléchargement depuis ${new URL(urlInput).hostname}…`,
           });
-          ({ tmpPath, filename: sourceFilename } =
-            await fetchUrlToTemp(urlInput));
+          ({ tmpPath, filename: sourceFilename } = await fetchUrlToTemp(urlInput));
 
           // Sauvegarde permanente du fichier téléchargé
           const urlContent = fs.readFileSync(tmpPath);
-          storedFilePath = saveUploadedFile(
-            gameSlug,
-            sourceFilename,
-            urlContent,
-          );
+          storedFilePath = saveUploadedFile(gameSlug, sourceFilename, urlContent);
         } else {
           // ── Mode fichier (comportement d'origine) ─────────────────────────
           const fichier = formData.get('fichier') as File | null;
@@ -209,11 +191,7 @@ export const POST: RequestHandler = async ({ request }) => {
           sourceFilename = fichier.name;
 
           // Sauvegarde permanente du fichier uploadé
-          storedFilePath = saveUploadedFile(
-            gameSlug,
-            fichier.name,
-            fileContent,
-          );
+          storedFilePath = saveUploadedFile(gameSlug, fichier.name, fileContent);
         }
 
         // ── Extraction + NLP ──────────────────────────────────────────────────
@@ -248,16 +226,14 @@ export const POST: RequestHandler = async ({ request }) => {
             metadata: result.metadata,
             statistiques: result.statistiques,
           },
-          isMerge,
+          isMerge
         );
 
         let insertedCount = 0;
         try {
           for (let i = 0; i < n; i++) {
             send({ type: 'embedding_progress', current: i + 1, total: n });
-            const embedding = await generateEmbeddingForSection(
-              result.sections[i],
-            );
+            const embedding = await generateEmbeddingForSection(result.sections[i]);
             await writer.insertSection({
               ...result.sections[i],
               section_id: `${gameSlug}_${idOffset + i}`,
@@ -271,11 +247,7 @@ export const POST: RequestHandler = async ({ request }) => {
           throw err;
         }
 
-        const actionLabel = isMerge
-          ? 'fusionné'
-          : alreadyExists
-            ? 'remplacé'
-            : 'ajouté';
+        const actionLabel = isMerge ? 'fusionné' : alreadyExists ? 'remplacé' : 'ajouté';
 
         send({
           type: 'done',

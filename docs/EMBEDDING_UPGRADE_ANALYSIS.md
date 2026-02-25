@@ -316,7 +316,7 @@ async function migrateInBackground() {
 
   for (const game of games) {
     // Régénère les embeddings avec e5-large
-    await reindexGame(game.id, "e5-large");
+    await reindexGame(game.id, 'e5-large');
 
     // Attend 1 sec pour ne pas saturer le CPU
     await sleep(1000);

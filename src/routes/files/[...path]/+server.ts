@@ -8,8 +8,9 @@
 
 import { error } from '@sveltejs/kit';
 import { fileExists, getAbsolutePath } from '../../../modules/fileStorage';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
+
 export const GET = async ({ params }: { params: { path: string } }) => {
   const filePath = params.path;
 

@@ -45,7 +45,7 @@ function truncateAtSentence(text: string, maxChars: number): string {
     truncated.lastIndexOf('.\n'),
     truncated.lastIndexOf('! '),
     truncated.lastIndexOf('? '),
-    truncated.lastIndexOf('; '),
+    truncated.lastIndexOf('; ')
   );
 
   if (lastSentenceEnd > maxChars * 0.6) {
@@ -97,20 +97,16 @@ function formatList(items: string[], maxItems: number): string {
 function buildSectionContext(
   scoredSection: ScoredSection,
   index: number,
-  gameName: string,
+  gameName: string
 ): string {
   const { section, score } = scoredSection;
   const lines: string[] = [];
 
   // ── En-tête de section ────────────────────────────────────────────────────
 
-  lines.push(
-    `╔═══════════════════════════════════════════════════════════════════════`,
-  );
+  lines.push(`╔═══════════════════════════════════════════════════════════════════════`);
   lines.push(`║ SECTION ${index + 1} — Pertinence : ${formatScore(score)}`);
-  lines.push(
-    `╠═══════════════════════════════════════════════════════════════════════`,
-  );
+  lines.push(`╠═══════════════════════════════════════════════════════════════════════`);
 
   // ── Métadonnées de base ───────────────────────────────────────────────────
 
@@ -151,9 +147,7 @@ function buildSectionContext(
     lines.push(`║ Mécaniques    : ${mecaniques}`);
   }
 
-  lines.push(
-    `╚═══════════════════════════════════════════════════════════════════════`,
-  );
+  lines.push(`╚═══════════════════════════════════════════════════════════════════════`);
 
   // ── Résumé (si disponible) ────────────────────────────────────────────────
 
@@ -197,7 +191,7 @@ export function buildEnrichedContext(
     age_minimum?: number | null;
     duree_minutes_min?: number | null;
     duree_minutes_max?: number | null;
-  },
+  }
 ): string {
   if (sections.length === 0) {
     return 'Aucune section pertinente trouvée.';
@@ -207,13 +201,9 @@ export function buildEnrichedContext(
 
   // ── En-tête global ────────────────────────────────────────────────────────
 
-  lines.push(
-    '═════════════════════════════════════════════════════════════════════════',
-  );
+  lines.push('═════════════════════════════════════════════════════════════════════════');
   lines.push(`  CONTEXTE ENRICHI — ${gameName.toUpperCase()}`);
-  lines.push(
-    '═════════════════════════════════════════════════════════════════════════',
-  );
+  lines.push('═════════════════════════════════════════════════════════════════════════');
 
   // ── Métadonnées du jeu ────────────────────────────────────────────────────
 
@@ -248,7 +238,7 @@ export function buildEnrichedContext(
 
   lines.push('');
   lines.push(
-    `📚 ${sections.length} section${sections.length > 1 ? 's' : ''} pertinente${sections.length > 1 ? 's' : ''} trouvée${sections.length > 1 ? 's' : ''} :`,
+    `📚 ${sections.length} section${sections.length > 1 ? 's' : ''} pertinente${sections.length > 1 ? 's' : ''} trouvée${sections.length > 1 ? 's' : ''} :`
   );
   lines.push('');
 
@@ -265,13 +255,9 @@ export function buildEnrichedContext(
   // ── Pied de page ──────────────────────────────────────────────────────────
 
   lines.push('');
-  lines.push(
-    '═════════════════════════════════════════════════════════════════════════',
-  );
+  lines.push('═════════════════════════════════════════════════════════════════════════');
   lines.push('  FIN DU CONTEXTE');
-  lines.push(
-    '═════════════════════════════════════════════════════════════════════════',
-  );
+  lines.push('═════════════════════════════════════════════════════════════════════════');
 
   return lines.join('\n');
 }
@@ -300,10 +286,7 @@ export function buildCompactContext(sections: ScoredSection[]): string {
       }
 
       // Chunking si disponible
-      if (
-        section.chunk_index !== undefined &&
-        section.total_chunks !== undefined
-      ) {
+      if (section.chunk_index !== undefined && section.total_chunks !== undefined) {
         parts.push(`Chunk ${section.chunk_index + 1}/${section.total_chunks}`);
       }
 
@@ -348,7 +331,7 @@ export interface ContextBuilderOptions {
 export function buildContext(
   sections: ScoredSection[],
   gameName: string,
-  options: ContextBuilderOptions = {},
+  options: ContextBuilderOptions = {}
 ): string {
   const { format = 'enriched', gameMetadata } = options;
 

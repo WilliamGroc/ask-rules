@@ -207,7 +207,7 @@ ask-rules/
 
 ```typescript
 // Dans pipeline.ts ou autre module
-import { chunkSections, enrichChunkContent } from "./modules/chunker";
+import { chunkSections, enrichChunkContent } from './modules/chunker';
 
 const chunks = chunkSections(rawSections);
 const enrichedContent = enrichChunkContent(chunks[0], true);
@@ -217,12 +217,12 @@ const enrichedContent = enrichChunkContent(chunks[0], true);
 
 ```typescript
 // API simple
-import { hybridSearch } from "./modules/hybridSearch";
+import { hybridSearch } from './modules/hybridSearch';
 
 const results = await hybridSearch(query, {
-  gameId: "mon-jeu",
+  gameId: 'mon-jeu',
   topN: 4,
-  fusionMethod: "rrf",
+  fusionMethod: 'rrf',
 });
 ```
 

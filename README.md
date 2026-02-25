@@ -186,8 +186,8 @@ pnpm add compromise-fr
 ```
 
 ```typescript
-import nlp from "compromise";
-import frPlugin from "compromise-fr";
+import nlp from 'compromise';
+import frPlugin from 'compromise-fr';
 nlp.extend(frPlugin);
 ```
 
@@ -211,21 +211,19 @@ depuis un LLM, vous pouvez utiliser :
 Exemple d'indexation avec Chroma :
 
 ```typescript
-import { ChromaClient } from "chromadb";
-import type { AnalysisResult } from "./src/types";
+import { ChromaClient } from 'chromadb';
+import type { AnalysisResult } from './src/types';
 
 const client = new ChromaClient();
-const collection = await client.createCollection({ name: "manuel" });
-const resultat: AnalysisResult = JSON.parse(
-  fs.readFileSync("data/resultat.json", "utf-8"),
-);
+const collection = await client.createCollection({ name: 'manuel' });
+const resultat: AnalysisResult = JSON.parse(fs.readFileSync('data/resultat.json', 'utf-8'));
 
 for (const section of resultat.sections) {
   await collection.add({
     ids: [section.titre],
     embeddings: [section.embedding as number[]], // vecteur OpenAI dense
     documents: [section.contenu],
-    metadatas: [{ actions: section.actions.join(",") }],
+    metadatas: [{ actions: section.actions.join(',') }],
   });
 }
 ```

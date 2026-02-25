@@ -195,7 +195,7 @@ const SPARSE_WEIGHT = 0.4; // 40% pour BM25
 ### Méthode de Fusion
 
 ```typescript
-fusionMethod: "rrf" | "weighted";
+fusionMethod: 'rrf' | 'weighted';
 ```
 
 **RRF (Reciprocal Rank Fusion)** - Recommandé
@@ -222,7 +222,7 @@ const selection = await retrieveFromBestGame(
   question,
   topN,
   0.1,
-  { useHybrid: false }, // ← Dense uniquement
+  { useHybrid: false } // ← Dense uniquement
 );
 ```
 

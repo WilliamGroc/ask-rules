@@ -95,7 +95,7 @@ const gameMetadata = gameEntry?.metadata;
 
 ```typescript
 const context = buildContext(sections, gameName, {
-  format: "compact", // ou 'enriched'
+  format: 'compact', // ou 'enriched'
   gameMetadata,
 });
 ```
@@ -188,7 +188,7 @@ Pour comparer, modifier temporairement [+page.server.ts](src/routes/+page.server
 
 ```typescript
 const context = buildContext(selection.sections, selection.jeu, {
-  format: "compact", // au lieu de 'enriched'
+  format: 'compact', // au lieu de 'enriched'
   gameMetadata: gameEntry?.metadata,
 });
 ```
@@ -287,7 +287,7 @@ const cachedMetadata = await redis.get(`game:${selection.jeu_id}:metadata`);
 
 ```typescript
 // Choisir automatiquement le format selon le LLM
-const format = model.includes("gpt-4") ? "enriched" : "compact";
+const format = model.includes('gpt-4') ? 'enriched' : 'compact';
 ```
 
 ### 3. Compression Sémantique

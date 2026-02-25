@@ -26,7 +26,12 @@
 }
 
 html {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   font-size: 16px;
   background: var(--bg);
   color: var(--text);
@@ -391,7 +396,7 @@ body {
   background: var(--surface-2);
   border-radius: 4px;
   color: #a78bfa;
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.83em;
   padding: 0.1em 0.4em;
 }
@@ -422,7 +427,7 @@ body {
 }
 
 .sources-summary::before {
-  content: "▶";
+  content: '▶';
   font-size: 0.65rem;
   transition: transform 0.2s;
 }
@@ -727,7 +732,7 @@ details[open] .sources-summary::before {
   background: rgba(124, 58, 237, 0.06);
 }
 
-.radio-label input[type="radio"] {
+.radio-label input[type='radio'] {
   margin-top: 0.15rem;
   accent-color: var(--accent);
   flex-shrink: 0;

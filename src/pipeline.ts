@@ -12,17 +12,8 @@ import { parseSections, classifySection } from './modules/sectionParser';
 import { analyzeText, detectMechanics } from './modules/nlpProcessor';
 import { extractGameMetadata, extractGameName } from './modules/gameExtractor';
 import { generateEmbedding } from './modules/embedder';
-import {
-  chunkSections,
-  enrichChunkContent,
-  getChunkingStats,
-} from './modules/chunker';
-import type {
-  GameAnalysisResult,
-  GameSection,
-  GameMechanic,
-  StoredSection,
-} from './types';
+import { chunkSections, enrichChunkContent, getChunkingStats } from './modules/chunker';
+import type { GameAnalysisResult, GameSection, GameMechanic, StoredSection } from './types';
 
 export interface PipelineOptions {
   /** Active la génération d'embeddings OpenAI ou TF-IDF dense */
@@ -35,7 +26,7 @@ export interface PipelineOptions {
 
 export async function analyseFile(
   filePath: string,
-  options: PipelineOptions = {},
+  options: PipelineOptions = {}
 ): Promise<GameAnalysisResult> {
   const { withEmbed = false, withChunking = false, onSection } = options;
 
@@ -64,7 +55,7 @@ export async function analyseFile(
     const stats = getChunkingStats(chunks);
     console.log(`\n📊 Chunking: ${stats.totalChunks} chunks générés`);
     console.log(
-      `   Mots par chunk: ${stats.minWords}-${stats.maxWords} (moy: ${stats.avgWordsPerChunk})`,
+      `   Mots par chunk: ${stats.minWords}-${stats.maxWords} (moy: ${stats.avgWordsPerChunk})`
     );
     console.log(`   Chunks avec overlap: ${stats.chunksWithOverlap}\n`);
   }
@@ -84,7 +75,9 @@ export async function analyseFile(
 
     const nlpResult = await analyzeText(item.content);
     const mecaniques = detectMechanics(item.content);
-    mecaniques.forEach((m) => { allMechanics.add(m) });
+    mecaniques.forEach((m) => {
+      allMechanics.add(m);
+    });
 
     const enriched: GameSection & Partial<StoredSection> = {
       titre: section.titre,

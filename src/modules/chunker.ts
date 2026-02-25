@@ -49,11 +49,7 @@ function splitIntoSentences(text: string): string[] {
     if (full.length > 0) {
       // Ignore les faux splits (abréviations courantes)
       const lastWord = sentence.trim().split(/\s+/).pop() ?? '';
-      if (
-        /^(M|Mme|Dr|Sr|Jr|etc|ex|vs|p|vol|n°)$/i.test(
-          lastWord.replace(/\.$/, ''),
-        )
-      ) {
+      if (/^(M|Mme|Dr|Sr|Jr|etc|ex|vs|p|vol|n°)$/i.test(lastWord.replace(/\.$/, ''))) {
         // Continue à accumuler
         if (i === 0) {
           sentences.push(full);
@@ -81,10 +77,7 @@ function splitIntoParagraphs(text: string): string[] {
  * Construit le chemin hiérarchique complet d'une section
  * Ex: sections[2] avec parent sections[0] → "MATÉRIEL > Cartes"
  */
-function buildHierarchyPath(
-  sections: RawSection[],
-  currentIndex: number,
-): string {
+function buildHierarchyPath(sections: RawSection[], currentIndex: number): string {
   const current = sections[currentIndex];
   if (!current) return '';
 
@@ -199,10 +192,7 @@ function chunkSection(section: RawSection, hierarchyPath: string): Chunk[] {
         const bufferWords = countWords(sentenceBuffer);
         const sentenceWords = countWords(sentence);
 
-        if (
-          bufferWords + sentenceWords > CHUNK_MAX_WORDS &&
-          bufferWords >= CHUNK_MIN_WORDS
-        ) {
+        if (bufferWords + sentenceWords > CHUNK_MAX_WORDS && bufferWords >= CHUNK_MIN_WORDS) {
           // Flush le buffer
           chunks.push({
             content: sentenceBuffer.trim(),
@@ -225,10 +215,7 @@ function chunkSection(section: RawSection, hierarchyPath: string): Chunk[] {
     }
 
     // Paragraphe normal
-    if (
-      currentWords + paraWords > CHUNK_TARGET_WORDS &&
-      currentWords >= CHUNK_MIN_WORDS
-    ) {
+    if (currentWords + paraWords > CHUNK_TARGET_WORDS && currentWords >= CHUNK_MIN_WORDS) {
       // Flush le chunk actuel
       chunks.push({
         content: currentContent.trim(),
@@ -240,8 +227,7 @@ function chunkSection(section: RawSection, hierarchyPath: string): Chunk[] {
         originalSection: section,
       });
       overlapBuffer = takeLastWords(currentContent, CHUNK_OVERLAP_WORDS);
-      currentContent =
-        overlapBuffer + (overlapBuffer ? '\n\n' : '') + paragraph;
+      currentContent = overlapBuffer + (overlapBuffer ? '\n\n' : '') + paragraph;
     } else {
       currentContent += (currentContent ? '\n\n' : '') + paragraph;
     }
@@ -300,10 +286,7 @@ export function chunkSections(sections: RawSection[]): Chunk[] {
  * @param includeMetadata - Si true, ajoute des métadonnées en préambule
  * @returns Contenu enrichi prêt pour l'embedding
  */
-export function enrichChunkContent(
-  chunk: Chunk,
-  includeMetadata = true,
-): string {
+export function enrichChunkContent(chunk: Chunk, includeMetadata = true): string {
   if (!includeMetadata) {
     return chunk.content;
   }
@@ -317,9 +300,7 @@ export function enrichChunkContent(
 
   // Ajoute l'indicateur de chunk si multi-chunk
   if (chunk.metadata.totalChunks > 1) {
-    parts.push(
-      `(Partie ${chunk.metadata.chunkIndex + 1}/${chunk.metadata.totalChunks})`,
-    );
+    parts.push(`(Partie ${chunk.metadata.chunkIndex + 1}/${chunk.metadata.totalChunks})`);
   }
 
   parts.push(''); // Ligne vide

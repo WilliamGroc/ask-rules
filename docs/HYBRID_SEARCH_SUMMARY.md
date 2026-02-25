@@ -177,7 +177,7 @@ const SPARSE_WEIGHT = 0.4; // 40% BM25
 ### Méthode de Fusion
 
 ```typescript
-fusionMethod: "rrf" | "weighted";
+fusionMethod: 'rrf' | 'weighted';
 ```
 
 **RRF (défaut)** : Plus robuste, indépendant de l'échelle  
@@ -194,7 +194,7 @@ const selection = await retrieveFromBestGame(
   question,
   topN,
   minScore,
-  { useHybrid: false }, // ← Dense uniquement
+  { useHybrid: false } // ← Dense uniquement
 );
 ```
 
