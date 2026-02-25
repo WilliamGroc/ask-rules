@@ -33,11 +33,7 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": [
-    "games",
-    "utilities",
-    "reference"
-  ],
+  "categories": ["games", "utilities", "reference"],
   "lang": "fr-FR",
   "dir": "ltr",
   "scope": "/",
