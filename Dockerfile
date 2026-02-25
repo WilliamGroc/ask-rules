@@ -28,7 +28,7 @@ RUN pnpm run build:web
 # @huggingface/transformers v3 lit env.cacheDir (API JS).
 # XDG_CACHE_HOME est relu dans embedder.ts au runtime.
 ENV XDG_CACHE_HOME=/hf-cache
-RUN printf 'import { env, pipeline } from "@huggingface/transformers";\nenv.cacheDir = "/hf-cache";\nawait pipeline("feature-extraction", "Xenova/paraphrase-multilingual-MiniLM-L12-v2");\nconsole.log("[docker] Modele pre-telecharge dans /hf-cache.");\n' \
+RUN printf 'import { env, pipeline } from "@huggingface/transformers";\nenv.cacheDir = "/hf-cache";\nawait pipeline("feature-extraction", "Xenova/multilingual-e5-small");\nconsole.log("[docker] Modele pre-telecharge dans /hf-cache.");\n' \
     | node --input-type=module \
  && ls /hf-cache
 

@@ -2,7 +2,7 @@
  * embedder.ts
  * Génère des embeddings denses (384 dims) pour la recherche pgvector.
  *
- * Modèle : Xenova/paraphrase-multilingual-MiniLM-L12-v2
+ * Modèle : Xenova/multilingual-e5-small
  *   - 384 dimensions, multilingue (français inclus)
  *   - Exécution 100% locale, pas d'API
  *   - 1er lancement : télécharge le modèle (~50MB) puis utilise le cache
@@ -30,11 +30,12 @@ async function getExtractor(): Promise<any> {
       let mod: any;
       try {
         mod = await import('@huggingface/transformers');
+        console.log('✔ Bibliothèque @huggingface/transformers chargée');
         pipeline = (mod as any).pipeline ?? (mod as any).default?.pipeline;
       } catch {
         throw new Error(
           'La bibliothèque "@huggingface/transformers" n\'est pas installée.\n' +
-            'Exécutez : pnpm add @huggingface/transformers'
+          'Exécutez : pnpm add @huggingface/transformers'
         );
       }
 
@@ -46,12 +47,20 @@ async function getExtractor(): Promise<any> {
 
       // q8 (int8 quantisé) : ~120 Mo vs ~470 Mo pour fp32.
       // La perte de qualité est négligeable pour les embeddings de phrases.
-      extractorInstance = await pipeline(
-        'feature-extraction',
-        'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-        { dtype: 'q8' }
-      );
-      return extractorInstance;
+      try {
+
+        extractorInstance = await pipeline(
+          'feature-extraction',
+          'Xenova/multilingual-e5-small',
+          { dtype: 'q8' }
+        );
+
+        console.log('✔ Extracteur initialisé avec Xenova/multilingual-e5-small');
+        return extractorInstance;
+      } catch (err) {
+        console.error('Erreur lors de l\'initialisation de l\'extracteur :', err);
+        throw new Error('Échec de l\'initialisation de l\'extracteur. Voir les logs pour plus de détails.');
+      }
     })();
   }
 

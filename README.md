@@ -85,7 +85,7 @@ pnpm add @huggingface/transformers  # Installation unique
 npx ts-node src/analyser.ts data/manuel.txt --embed
 ```
 
-- **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dims)
+- **Modèle** : `Xenova/multilingual-e5-small` (384 dims)
 - **Avantages** :
   - ✅ 100% gratuit et offline (après 1er téléchargement)
   - ✅ Multilingue optimisé (français, anglais, etc.)

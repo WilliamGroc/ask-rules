@@ -37,7 +37,7 @@ async function migrate(): Promise<void> {
     console.log('✔ Table "games" prête');
 
     // ── Table sections ────────────────────────────────────────────────────────
-    // embedding : vecteur dense 384 dims (Xenova/paraphrase-multilingual-MiniLM-L12-v2)
+    // embedding : vecteur dense 384 dims (Xenova/multilingual-e5-small)
     // Colonnes de chunking hiérarchique (v2) :
     //   - hierarchy_path : chemin complet (ex: "MATÉRIEL > Cartes")
     //   - chunk_index    : index du chunk (0, 1, 2...)

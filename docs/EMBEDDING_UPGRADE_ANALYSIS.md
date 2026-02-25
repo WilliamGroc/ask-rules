@@ -395,6 +395,6 @@ Avant d'upgrader le modèle d'embeddings, explorer d'abord ces améliorations **
 
 - [MTEB Leaderboard](https://huggingface.co/spaces/mteb/leaderboard)
 - [intfloat/multilingual-e5-large](https://huggingface.co/intfloat/multilingual-e5-large)
-- [Xenova/paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2)
+- [Xenova/multilingual-e5-small](https://huggingface.co/Xenova/multilingual-e5-small)
 - [pgvector Performance Tuning](https://github.com/pgvector/pgvector#performance)
 - [Reranking vs Larger Embeddings](https://www.pinecone.io/learn/series/rag/rerankers/)
