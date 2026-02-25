@@ -71,30 +71,49 @@ export const actions = {
       const game = gameRes.rows[0];
       const filePath = game.fichier;
 
-      // Vérifie que le fichier existe
       const fs = await import('node:fs');
       const path = await import('node:path');
-      const absolutePath = path.resolve(process.cwd(), filePath);
 
-      if (!fs.existsSync(absolutePath)) {
-        return fail(404, {
-          error: `Fichier source introuvable : ${filePath}`,
-        });
+      // Découpe les chemins de fichiers (séparés par " + " si plusieurs)
+      const filePaths = filePath.split(' + ').map((p) => p.trim());
+
+      // Vérifie que tous les fichiers existent
+      for (const fp of filePaths) {
+        const absolutePath = path.resolve(process.cwd(), fp);
+        if (!fs.existsSync(absolutePath)) {
+          return fail(404, {
+            error: `Fichier source introuvable : ${fp}`,
+          });
+        }
       }
 
-      // Réexécute le pipeline complet
+      // Réexécute le pipeline pour chaque fichier
       const { analyseFile } = await import('../../../pipeline');
       const { upsertGame } = await import('../../../modules/knowledgeBase');
       const { generateEmbeddingForSection } = await import('../../../modules/embedder');
 
-      const result = await analyseFile(absolutePath, {
-        withEmbed: false,
-        withChunking: true,
-      });
+      const allSections: any[] = [];
+      let mergedMetadata = {};
+      let mergedStatistics = {};
+
+      for (const fp of filePaths) {
+        const absolutePath = path.resolve(process.cwd(), fp);
+
+        const result = await analyseFile(absolutePath, {
+          withEmbed: false,
+          withChunking: true,
+        });
+
+        allSections.push(...result.sections);
+
+        // Fusionne les métadonnées (prend les valeurs du dernier fichier)
+        mergedMetadata = { ...mergedMetadata, ...result.metadata };
+        mergedStatistics = { ...mergedStatistics, ...result.statistiques };
+      }
 
       // Génère les embeddings pour toutes les sections
       const sectionsWithEmbeddings = await Promise.all(
-        result.sections.map(async (section, i) => {
+        allSections.map(async (section, i) => {
           const embedding = await generateEmbeddingForSection(section);
           return {
             ...section,
@@ -108,10 +127,10 @@ export const actions = {
       await upsertGame({
         id: gameId,
         jeu: game.jeu,
-        fichier: filePath,
+        fichier: filePath, // Conserve la chaîne originale avec " + "
         date_ajout: new Date().toISOString(),
-        metadata: result.metadata,
-        statistiques: result.statistiques,
+        metadata: mergedMetadata,
+        statistiques: mergedStatistics,
         sections: sectionsWithEmbeddings,
       });
 
@@ -151,25 +170,49 @@ export const actions = {
 
           const fs = await import('node:fs');
           const path = await import('node:path');
-          const absolutePath = path.resolve(process.cwd(), filePath);
 
-          if (!fs.existsSync(absolutePath)) {
-            errors.push(`${game.jeu}: fichier introuvable`);
+          // Découpe les chemins de fichiers (séparés par " + " si plusieurs)
+          const filePaths = filePath.split(' + ').map((p: string) => p.trim());
+
+          // Vérifie que tous les fichiers existent
+          let allFilesExist = true;
+          for (const fp of filePaths) {
+            const absolutePath = path.resolve(process.cwd(), fp);
+            if (!fs.existsSync(absolutePath)) {
+              errors.push(`${game.jeu}: fichier introuvable (${fp})`);
+              allFilesExist = false;
+              break;
+            }
+          }
+
+          if (!allFilesExist) {
             continue;
           }
 
-          // Réexécute le pipeline
+          // Réexécute le pipeline pour chaque fichier
           const { analyseFile } = await import('../../../pipeline');
           const { upsertGame } = await import('../../../modules/knowledgeBase');
           const { generateEmbeddingForSection } = await import('../../../modules/embedder');
 
-          const result = await analyseFile(absolutePath, {
-            withEmbed: false,
-            withChunking: true,
-          });
+          const allSections: any[] = [];
+          let mergedMetadata = {};
+          let mergedStatistics = {};
+
+          for (const fp of filePaths) {
+            const absolutePath = path.resolve(process.cwd(), fp);
+
+            const result = await analyseFile(absolutePath, {
+              withEmbed: false,
+              withChunking: true,
+            });
+
+            allSections.push(...result.sections);
+            mergedMetadata = { ...mergedMetadata, ...result.metadata };
+            mergedStatistics = { ...mergedStatistics, ...result.statistiques };
+          }
 
           const sectionsWithEmbeddings = await Promise.all(
-            result.sections.map(async (section, i) => {
+            allSections.map(async (section, i) => {
               const embedding = await generateEmbeddingForSection(section);
               return {
                 ...section,
@@ -184,8 +227,8 @@ export const actions = {
             jeu: game.jeu,
             fichier: filePath,
             date_ajout: new Date().toISOString(),
-            metadata: result.metadata,
-            statistiques: result.statistiques,
+            metadata: mergedMetadata,
+            statistiques: mergedStatistics,
             sections: sectionsWithEmbeddings,
           });
 

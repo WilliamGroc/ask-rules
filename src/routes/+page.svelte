@@ -164,24 +164,24 @@
           {#if form.matchedName}<span class="badge-tag">mentionné</span>{/if}
         </div>
 
-        <!-- Lien de téléchargement du fichier source -->
+        <!-- Lien(s) de téléchargement du fichier source -->
         {#if form.fichier}
+          {@const filePaths = form.fichier.split(' + ').map((p) => p.trim())}
           <div class="file-download">
-            <a
-              href="/files/{form.fichier}"
-              class="file-download-link"
-              target="_blank"
-              rel="noopener"
-            >
-              <span class="file-icon">📄</span>
-              <span class="file-text">
-                <span class="file-label">Fichier source</span>
-                <span class="file-name"
-                  >{form.fichier.split('/').pop()?.replace(/^\d+_/, '') || 'Télécharger'}</span
-                >
-              </span>
-              <span class="file-arrow">↓</span>
-            </a>
+            {#each filePaths as filePath, index}
+              <a href="/files/{filePath}" class="file-download-link" target="_blank" rel="noopener">
+                <span class="file-icon">📄</span>
+                <span class="file-text">
+                  <span class="file-label">
+                    {filePaths.length > 1 ? `Fichier source ${index + 1}` : 'Fichier source'}
+                  </span>
+                  <span class="file-name">
+                    {filePath.split('/').pop()?.replace(/^\d+_/, '') || 'Télécharger'}
+                  </span>
+                </span>
+                <span class="file-arrow">↓</span>
+              </a>
+            {/each}
           </div>
         {/if}
 
