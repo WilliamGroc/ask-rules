@@ -115,8 +115,8 @@ export interface KnowledgeBaseEntry {
   jeu: string;
   fichier: string;
   date_ajout: string;
-  metadata: GameMetadata;
-  statistiques: Statistics;
+  metadata: Partial<GameMetadata>;
+  statistiques: Partial<Statistics>;
   sections: StoredSection[];
 }
 

@@ -320,13 +320,6 @@
     flex: 1;
   }
 
-  .value code {
-    background: #f5f5f5;
-    padding: 0.125rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-  }
-
   .file-name {
     word-break: break-all;
   }

@@ -1,7 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
-import { listGames, removeGame, summarizeKB } from '../../../modules/knowledgeBase';
+import { listGames, removeGame, summarizeKB, upsertGame } from '../../../modules/knowledgeBase';
 import { fail } from '@sveltejs/kit';
 import pool from '../../../modules/db';
+import path from 'node:path';
+import { analyseFile } from '../../../pipeline';
+import { generateEmbeddingForSection } from '../../../modules/embedder';
+import fs from 'node:fs';
+import type { GameMetadata, GameSection, Statistics } from '../../../types';
 
 export const load: PageServerLoad = async () => {
   const games = await listGames();
@@ -69,10 +74,7 @@ export const actions = {
       }
 
       const game = gameRes.rows[0];
-      const filePath = game.fichier;
-
-      const fs = await import('node:fs');
-      const path = await import('node:path');
+      const filePath = game.fichier as string;
 
       // Découpe les chemins de fichiers (séparés par " + " si plusieurs)
       const filePaths = filePath.split(' + ').map((p) => p.trim());
@@ -88,13 +90,9 @@ export const actions = {
       }
 
       // Réexécute le pipeline pour chaque fichier
-      const { analyseFile } = await import('../../../pipeline');
-      const { upsertGame } = await import('../../../modules/knowledgeBase');
-      const { generateEmbeddingForSection } = await import('../../../modules/embedder');
-
-      const allSections: any[] = [];
-      let mergedMetadata = {};
-      let mergedStatistics = {};
+      const allSections: GameSection[] = [];
+      let mergedMetadata: Partial<GameMetadata> = {};
+      let mergedStatistics: Partial<Statistics> = {};
 
       for (const fp of filePaths) {
         const absolutePath = path.resolve(process.cwd(), fp);
@@ -190,13 +188,9 @@ export const actions = {
           }
 
           // Réexécute le pipeline pour chaque fichier
-          const { analyseFile } = await import('../../../pipeline');
-          const { upsertGame } = await import('../../../modules/knowledgeBase');
-          const { generateEmbeddingForSection } = await import('../../../modules/embedder');
-
-          const allSections: any[] = [];
-          let mergedMetadata = {};
-          let mergedStatistics = {};
+          const allSections: GameSection[] = [];
+          let mergedMetadata: Partial<GameMetadata> = {};
+          let mergedStatistics: Partial<Statistics> = {};
 
           for (const fp of filePaths) {
             const absolutePath = path.resolve(process.cwd(), fp);

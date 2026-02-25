@@ -25,12 +25,6 @@ export const GET = async ({ params }: { params: { path: string } }) => {
 
   const absolutePath = getAbsolutePath(filePath);
 
-  // Sécurité : vérifie que le fichier est bien dans uploads/
-  const uploadsDir = path.resolve(process.cwd(), 'uploads');
-  if (!absolutePath.startsWith(uploadsDir)) {
-    throw error(403, 'Accès refusé');
-  }
-
   // Lit le fichier
   const fileContent = fs.readFileSync(absolutePath);
 
@@ -45,7 +39,7 @@ export const GET = async ({ params }: { params: { path: string } }) => {
   // Nom de fichier pour le téléchargement
   const filename = path.basename(filePath);
 
-  return new Response(fileContent as any, {
+  return new Response(new Uint8Array(fileContent), {
     headers: {
       'Content-Type': contentType,
       'Content-Disposition': `inline; filename="${filename}"`,

@@ -63,7 +63,7 @@ export function saveUploadedFile(
   fs.writeFileSync(absolutePath, content as any);
 
   // Retourne le chemin relatif depuis la racine du projet
-  return path.relative(process.cwd(), absolutePath);
+  return path.relative(UPLOADS_DIR, absolutePath);
 }
 
 /**
@@ -86,7 +86,7 @@ export function moveToStorage(tmpPath: string, gameSlug: string, originalFilenam
  * @returns Chemin absolu
  */
 export function getAbsolutePath(relativePath: string): string {
-  return path.resolve(process.cwd(), relativePath);
+  return path.resolve(UPLOADS_DIR, relativePath);
 }
 
 /**
@@ -115,8 +115,7 @@ export function listGameFiles(gameSlug: string): string[] {
 
   return fs
     .readdirSync(gameDir)
-    .filter((f) => !f.startsWith('.'))
-    .map((f) => path.join('uploads', gameSlug, f));
+    .filter((f) => !f.startsWith('.'));
 }
 
 /**
