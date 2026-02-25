@@ -8,6 +8,8 @@
 
   let deletingGame: string | null = null;
   let confirmDelete: string | null = null;
+  let reprocessingGame: string | null = null;
+  let reprocessingAll = false;
 
   function handleDeleteClick(gameId: string) {
     if (confirmDelete === gameId) {
@@ -46,7 +48,33 @@
     <h1>🎮 Gestion des Jeux</h1>
     <p class="summary">{data.summary}</p>
   </div>
-  <a href="/import" class="btn btn-primary">+ Importer un jeu</a>
+  <div class="header-actions">
+    <form
+      method="POST"
+      action="?/reprocessAll"
+      use:enhance={() => {
+        reprocessingAll = true;
+        return async ({ update }) => {
+          await update();
+          reprocessingAll = false;
+        };
+      }}
+    >
+      <button
+        type="submit"
+        class="btn btn-secondary"
+        disabled={reprocessingAll || data.games.length === 0}
+      >
+        {#if reprocessingAll}
+          <span class="spinner" aria-hidden="true"></span>
+          Recalcul...
+        {:else}
+          🔄 Tout recalculer
+        {/if}
+      </button>
+    </form>
+    <a href="/import" class="btn btn-primary">+ Importer un jeu</a>
+  </div>
 </div>
 
 {#if form?.success}
@@ -108,6 +136,33 @@
       <div class="game-actions">
         <form
           method="POST"
+          action="?/reprocess"
+          use:enhance={() => {
+            reprocessingGame = game.id;
+            return async ({ update }) => {
+              await update();
+              reprocessingGame = null;
+            };
+          }}
+        >
+          <input type="hidden" name="gameId" value={game.id} />
+          <button
+            type="submit"
+            class="btn btn-secondary-outline"
+            disabled={reprocessingGame === game.id}
+            title="Recalculer les embeddings avec le modèle actuel"
+          >
+            {#if reprocessingGame === game.id}
+              <span class="spinner-small" aria-hidden="true"></span>
+              Recalcul...
+            {:else}
+              🔄 Recalculer
+            {/if}
+          </button>
+        </form>
+
+        <form
+          method="POST"
           action="?/delete"
           use:enhance={() => {
             deletingGame = game.id;
@@ -155,6 +210,12 @@
     align-items: start;
     margin-bottom: 2rem;
     gap: 1rem;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
   }
 
   h1 {
@@ -292,6 +353,9 @@
   .game-actions {
     padding-top: 1rem;
     border-top: 1px solid #f0f0f0;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .game-actions form {
@@ -350,8 +414,55 @@
     color: white;
   }
 
-  .btn-secondary:hover {
+  .btn-secondary:hover:not(:disabled) {
     background: #4b5563;
+  }
+
+  .btn-secondary:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .btn-secondary-outline {
+    background: transparent;
+    color: #6b7280;
+    border: 2px solid #d1d5db;
+  }
+
+  .btn-secondary-outline:hover:not(:disabled) {
+    background: #f3f4f6;
+    border-color: #6b7280;
+  }
+
+  .btn-secondary-outline:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .spinner,
+  .spinner-small {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+  }
+
+  .spinner-small {
+    width: 0.875em;
+    height: 0.875em;
+    border-width: 2px;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .empty-state {
