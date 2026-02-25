@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from './$types';
+  import SEO from '$lib/SEO.svelte';
 
   export let data: PageData;
 
@@ -108,10 +109,11 @@
   }
 </script>
 
-<svelte:head>
-  <title>Ask Rules — Importer des règles</title>
-  <meta name="description" content="Importez un fichier de règles de jeu de société." />
-</svelte:head>
+<SEO
+  title="Importer des règles - Ask Rules"
+  description="Importez et indexez vos règles de jeux de société au format PDF ou TXT. Notre IA analyse automatiquement les règles pour répondre à vos questions."
+  keywords="importer règles, PDF jeu de société, indexation règles, upload règles jeu, analyse règles PDF"
+/>
 
 <div class="page">
   <!-- En-tête -->

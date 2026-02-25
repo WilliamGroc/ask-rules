@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
   import type { PageData } from './$types';
   import type { GameSectionType } from '../types';
+  import SEO from '$lib/SEO.svelte';
 
   export let data: PageData;
   export let form:
@@ -60,10 +61,11 @@
   }
 </script>
 
-<svelte:head>
-  <title>Ask Rules — Règles de jeu de société</title>
-  <meta name="description" content="Posez des questions sur vos règles de jeu indexées." />
-</svelte:head>
+<SEO
+  title="Ask Rules — Assistant IA pour règles de jeux de société"
+  description="Posez des questions sur vos jeux de société préférés et obtenez des réponses instantanées grâce à notre IA. Recherche intelligente dans les règles de vos jeux."
+  keywords="jeux de société, règles de jeu, IA, assistant intelligent, board games, questions réponses, recherche règles, aide jeu de société"
+/>
 
 <div class="page">
   <!-- En-tête -->

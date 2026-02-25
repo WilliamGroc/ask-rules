@@ -1,6 +1,7 @@
 <script>
   import '../app.css';
   import { page } from '$app/stores';
+  import PWAInstall from '$lib/PWAInstall.svelte';
 </script>
 
 <nav class="nav">
@@ -14,3 +15,5 @@
 </nav>
 
 <slot />
+
+<PWAInstall />

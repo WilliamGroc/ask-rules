@@ -1,6 +1,7 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import type { PageData, ActionData } from './$types';
+  import SEO from '$lib/SEO.svelte';
 
   export let data: PageData;
   export let form: ActionData;
@@ -34,8 +35,10 @@
   }
 </script>
 
+<SEO title="Gestion des Jeux - Admin" description="Interface d'administration des jeux" />
+
 <svelte:head>
-  <title>Gestion des Jeux - Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <div class="page-header">

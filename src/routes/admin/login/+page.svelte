@@ -1,14 +1,21 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import type { ActionData } from './$types';
+  import SEO from '$lib/SEO.svelte';
 
   export let form: ActionData;
 
   let isLoggingIn = false;
 </script>
 
+<SEO
+  title="Connexion Admin - Ask Rules"
+  description="Page de connexion à l'interface d'administration Ask Rules"
+/>
+
+<!-- Robots meta pour bloquer l'indexation -->
 <svelte:head>
-  <title>Connexion Admin - Ask Rules</title>
+  <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <main class="login-page">
