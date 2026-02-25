@@ -72,7 +72,7 @@ export const actions: Actions = {
         used_llm: llm.used_llm,
         model: llm.model,
         fichier: gameEntry?.fichier ?? null,
-        sections: selection.sections.map(s => ({
+        sections: selection.sections.map((s) => ({
           titre: s.section.titre,
           type_section: s.section.type_section,
           resume: s.section.resume,

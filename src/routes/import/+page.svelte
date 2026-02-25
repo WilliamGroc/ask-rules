@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { PageData } from './$types';
+  import type { PageData } from "./$types";
 
   export let data: PageData;
 
   // ── État du formulaire ──────────────────────────────────────────────────────
   let isLoading = false;
-  let selectedGame = '';
-  let gameNameValue = '';
-  let importMode: 'file' | 'url' = 'file';
+  let selectedGame = "";
+  let gameNameValue = "";
+  let importMode: "file" | "url" = "file";
 
   function onGameSelect(e: Event) {
     const select = e.target as HTMLSelectElement;
@@ -21,8 +21,14 @@
   // ── État de la progression ──────────────────────────────────────────────────
   type Step = { message: string };
   type EmbeddingState = { current: number; total: number };
-  type SuccessResult = { ok: true; jeu: string; sections: number; action: string; mecaniques: string[] };
-  type ErrorResult   = { ok: false; error: string };
+  type SuccessResult = {
+    ok: true;
+    jeu: string;
+    sections: number;
+    action: string;
+    mecaniques: string[];
+  };
+  type ErrorResult = { ok: false; error: string };
 
   let steps: Step[] = [];
   let embedding: EmbeddingState | null = null;
@@ -32,57 +38,71 @@
   async function handleSubmit(e: SubmitEvent) {
     e.preventDefault();
     isLoading = true;
-    steps     = [];
+    steps = [];
     embedding = null;
-    result    = null;
+    result = null;
 
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
 
     try {
-      const response = await fetch('/import/stream', { method: 'POST', body: formData });
+      const response = await fetch("/import/stream", {
+        method: "POST",
+        body: formData,
+      });
 
-      if (!response.body) throw new Error(`Erreur serveur (${response.status})`);
+      if (!response.body)
+        throw new Error(`Erreur serveur (${response.status})`);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
+          if (!line.startsWith("data: ")) continue;
           let evt: Record<string, unknown>;
-          try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+          try {
+            evt = JSON.parse(line.slice(6));
+          } catch {
+            continue;
+          }
 
-          if (evt.type === 'step') {
+          if (evt.type === "step") {
             steps = [...steps, { message: evt.message as string }];
-          } else if (evt.type === 'embedding_start') {
+          } else if (evt.type === "embedding_start") {
             embedding = { current: 0, total: evt.total as number };
-          } else if (evt.type === 'embedding_progress') {
-            embedding = { current: evt.current as number, total: evt.total as number };
-          } else if (evt.type === 'done') {
+          } else if (evt.type === "embedding_progress") {
+            embedding = {
+              current: evt.current as number,
+              total: evt.total as number,
+            };
+          } else if (evt.type === "done") {
             embedding = null;
             result = {
               ok: true,
-              jeu:       evt.jeu      as string,
-              sections:  evt.sections  as number,
-              action:    evt.action    as string,
+              jeu: evt.jeu as string,
+              sections: evt.sections as number,
+              action: evt.action as string,
               mecaniques: evt.mecaniques as string[],
             };
-          } else if (evt.type === 'error') {
+          } else if (evt.type === "error") {
             result = { ok: false, error: evt.message as string };
           }
         }
       }
     } catch (err) {
-      result = { ok: false, error: err instanceof Error ? err.message : String(err) };
+      result = {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
 
     isLoading = false;
@@ -201,19 +221,19 @@
           type="button"
           class="import-tab{importMode === 'file' ? ' active' : ''}"
           disabled={isLoading}
-          on:click={() => (importMode = 'file')}
-        >Fichier</button>
+          on:click={() => (importMode = "file")}>Fichier</button
+        >
         <button
           type="button"
           class="import-tab{importMode === 'url' ? ' active' : ''}"
           disabled={isLoading}
-          on:click={() => (importMode = 'url')}
-        >URL</button>
+          on:click={() => (importMode = "url")}>URL</button
+        >
       </div>
 
       <input type="hidden" name="importMode" value={importMode} />
 
-      {#if importMode === 'file'}
+      {#if importMode === "file"}
         <div class="file-input-wrapper">
           <input
             id="fichier"
@@ -234,7 +254,8 @@
           placeholder="https://exemple.com/regles.pdf  ou  https://exemple.com/faq"
           disabled={isLoading}
         />
-        <span class="form-hint">PDF, page HTML (FAQ) ou fichier texte brut</span>
+        <span class="form-hint">PDF, page HTML (FAQ) ou fichier texte brut</span
+        >
       {/if}
     </div>
 
@@ -257,7 +278,6 @@
   <!-- Progression + résultat -->
   {#if isLoading || result || steps.length > 0}
     <section class="result-section" aria-live="polite">
-
       <!-- Étapes terminées -->
       {#if steps.length > 0}
         <div class="progress-steps">
@@ -275,12 +295,21 @@
         <div class="progress-bar-wrapper">
           <div class="progress-bar-label">
             <span>Génération des embeddings</span>
-            <span class="progress-bar-count">{embedding.current} / {embedding.total}</span>
+            <span class="progress-bar-count"
+              >{embedding.current} / {embedding.total}</span
+            >
           </div>
-          <div class="progress-bar-track" role="progressbar" aria-valuenow={embedding.current} aria-valuemax={embedding.total}>
+          <div
+            class="progress-bar-track"
+            role="progressbar"
+            aria-valuenow={embedding.current}
+            aria-valuemax={embedding.total}
+          >
             <div
               class="progress-bar-fill"
-              style="width: {embedding.total > 0 ? (embedding.current / embedding.total) * 100 : 0}%"
+              style="width: {embedding.total > 0
+                ? (embedding.current / embedding.total) * 100
+                : 0}%"
             ></div>
           </div>
         </div>
@@ -307,7 +336,10 @@
               <div class="success-row">
                 <span class="success-key">Sections</span>
                 <span class="success-val"
-                  >{result.sections} section{result.sections > 1 ? 's' : ''} indexée{result.sections > 1 ? 's' : ''}</span
+                  >{result.sections} section{result.sections > 1 ? "s" : ""} indexée{result.sections >
+                  1
+                    ? "s"
+                    : ""}</span
                 >
               </div>
               <div class="success-row">
@@ -317,14 +349,14 @@
               {#if result.mecaniques && result.mecaniques.length > 0}
                 <div class="success-row">
                   <span class="success-key">Mécaniques</span>
-                  <span class="success-val">{result.mecaniques.join(', ')}</span>
+                  <span class="success-val">{result.mecaniques.join(", ")}</span
+                  >
                 </div>
               {/if}
             </div>
           </div>
         {/if}
       {/if}
-
     </section>
   {/if}
 
@@ -332,10 +364,10 @@
   <footer class="footer">
     {#if data.games.length > 0}
       <span
-        >{data.games.length} jeu{data.games.length > 1 ? 'x' : ''} indexé{data
+        >{data.games.length} jeu{data.games.length > 1 ? "x" : ""} indexé{data
           .games.length > 1
-          ? 's'
-          : ''} dans la base</span
+          ? "s"
+          : ""} dans la base</span
       >
     {:else}
       <span>Base vide — importez votre premier jeu</span>

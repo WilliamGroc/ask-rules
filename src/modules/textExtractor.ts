@@ -4,8 +4,8 @@
  * Supporte : .txt, .md, .pdf
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { PDFParse, type PageTextResult } from 'pdf-parse';
 
 /**
@@ -45,8 +45,10 @@ async function extractFromPdf(filePath: string): Promise<PageTextResult[]> {
   const result = await parser.getText({ pageJoiner: '\n%%PAGE:page_number%%' });
   await parser.destroy();
 
-  console.log(`[textExtractor] Extraction PDF terminée : ${result.total} caractères extraits.`);
-  return result.pages.map(p => ({ ...p, text: normalizePageText(p.text) }));
+  console.log(
+    `[textExtractor] Extraction PDF terminée : ${result.total} caractères extraits.`,
+  );
+  return result.pages.map((p) => ({ ...p, text: normalizePageText(p.text) }));
 }
 
 /**

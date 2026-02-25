@@ -6,9 +6,14 @@
  * La similarité vectorielle est calculée par pgvector (colonne vector(384)).
  */
 
-import pool from './db';
-import type { KnowledgeBaseEntry, StoredSection, GameMetadata, Statistics } from '../types';
 import { deleteGameFiles } from './fileStorage';
+import type {
+  KnowledgeBaseEntry,
+  StoredSection,
+  GameMetadata,
+  Statistics,
+} from '../types';
+import pool from './db';
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
 
@@ -63,9 +68,10 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
 
     // Insère les nouvelles sections
     for (const section of entry.sections) {
-      const embedding = section.embedding && section.embedding.length > 0
-        ? toVectorLiteral(section.embedding as number[])
-        : null;
+      const embedding =
+        section.embedding && section.embedding.length > 0
+          ? toVectorLiteral(section.embedding as number[])
+          : null;
 
       await client.query(
         `INSERT INTO sections
@@ -137,9 +143,10 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
 
     // Insère les nouvelles sections (IDs déjà décalés par l'offset)
     for (const section of entry.sections) {
-      const embedding = section.embedding && section.embedding.length > 0
-        ? toVectorLiteral(section.embedding as number[])
-        : null;
+      const embedding =
+        section.embedding && section.embedding.length > 0
+          ? toVectorLiteral(section.embedding as number[])
+          : null;
 
       await client.query(
         `INSERT INTO sections
@@ -196,7 +203,10 @@ export async function mergeGame(entry: KnowledgeBaseEntry): Promise<void> {
  */
 export async function openSectionWriter(
   gameId: string,
-  meta: Pick<KnowledgeBaseEntry, 'jeu' | 'fichier' | 'date_ajout' | 'metadata' | 'statistiques'>,
+  meta: Pick<
+    KnowledgeBaseEntry,
+    'jeu' | 'fichier' | 'date_ajout' | 'metadata' | 'statistiques'
+  >,
   isMerge: boolean,
 ): Promise<{
   insertSection(section: StoredSection): Promise<void>;
@@ -220,17 +230,24 @@ export async function openSectionWriter(
          fichier      = EXCLUDED.fichier,
          metadata     = EXCLUDED.metadata,
          statistiques = EXCLUDED.statistiques`,
-      [gameId, meta.jeu, meta.fichier, meta.date_ajout,
-        JSON.stringify(meta.metadata), JSON.stringify(meta.statistiques)],
+      [
+        gameId,
+        meta.jeu,
+        meta.fichier,
+        meta.date_ajout,
+        JSON.stringify(meta.metadata),
+        JSON.stringify(meta.statistiques),
+      ],
     );
     await client.query('DELETE FROM sections WHERE game_id = $1', [gameId]);
   }
 
   return {
     async insertSection(section: StoredSection) {
-      const embedding = section.embedding && section.embedding.length > 0
-        ? toVectorLiteral(section.embedding as number[])
-        : null;
+      const embedding =
+        section.embedding && section.embedding.length > 0
+          ? toVectorLiteral(section.embedding as number[])
+          : null;
       await client.query(
         `INSERT INTO sections
            (id, game_id, titre, niveau, type_section, contenu,
@@ -238,11 +255,22 @@ export async function openSectionWriter(
             page_debut, page_fin, hierarchy_path, chunk_index, total_chunks)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
-          section.section_id, gameId,
-          section.titre, section.niveau, section.type_section, section.contenu,
-          section.entites, section.actions, section.resume, section.mecaniques,
-          embedding, section.page_debut ?? null, section.page_fin ?? null,
-          section.hierarchy_path ?? '', section.chunk_index ?? 0, section.total_chunks ?? 1,
+          section.section_id,
+          gameId,
+          section.titre,
+          section.niveau,
+          section.type_section,
+          section.contenu,
+          section.entites,
+          section.actions,
+          section.resume,
+          section.mecaniques,
+          embedding,
+          section.page_debut ?? null,
+          section.page_fin ?? null,
+          section.hierarchy_path ?? '',
+          section.chunk_index ?? 0,
+          section.total_chunks ?? 1,
         ],
       );
     },
@@ -258,7 +286,9 @@ export async function openSectionWriter(
 }
 
 /** Trouve un jeu par son identifiant ou son chemin de fichier. */
-export async function findGame(idOrPath: string): Promise<KnowledgeBaseEntry | null> {
+export async function findGame(
+  idOrPath: string,
+): Promise<KnowledgeBaseEntry | null> {
   const res = await pool.query(
     'SELECT * FROM games WHERE id = $1 OR fichier = $2',
     [idOrPath, idOrPath],
@@ -287,8 +317,12 @@ export async function removeGame(id: string): Promise<void> {
 }
 
 /** Retourne la liste de tous les jeux (sans leurs sections). */
-export async function listGames(): Promise<Array<{ id: string; jeu: string; fichier: string }>> {
-  const res = await pool.query('SELECT id, jeu, fichier FROM games ORDER BY jeu');
+export async function listGames(): Promise<
+  Array<{ id: string; jeu: string; fichier: string }>
+> {
+  const res = await pool.query(
+    'SELECT id, jeu, fichier FROM games ORDER BY jeu',
+  );
   return res.rows;
 }
 

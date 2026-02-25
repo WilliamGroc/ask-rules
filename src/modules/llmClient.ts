@@ -24,21 +24,27 @@ Ne répète pas les extraits de règles mot pour mot : synthétise et explique.`
 
 // ── Mode Mistral ──────────────────────────────────────────────────────────────
 
-async function queryMistral(question: string, context: string): Promise<LLMResponse> {
-  const apiKey = process.env['MISTRAL_API_KEY'] ?? '';
-  const model = process.env['MISTRAL_MODEL'] ?? 'mistral-small-latest';
+async function queryMistral(
+  question: string,
+  context: string,
+): Promise<LLMResponse> {
+  const apiKey = process.env.MISTRAL_API_KEY ?? '';
+  const model = process.env.MISTRAL_MODEL ?? 'mistral-small-latest';
 
   const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `CONTEXTE :\n${context}\n\nQUESTION : ${question}` },
+        {
+          role: 'user',
+          content: `CONTEXTE :\n${context}\n\nQUESTION : ${question}`,
+        },
       ],
       temperature: 0.2,
       max_tokens: 700,
@@ -50,7 +56,7 @@ async function queryMistral(question: string, context: string): Promise<LLMRespo
     throw new Error(`Mistral HTTP ${response.status}: ${err}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     choices: Array<{ message: { content: string } }>;
     model: string;
   };
@@ -78,21 +84,29 @@ interface OpenAIChatClient {
   };
 }
 
-async function queryOpenAI(question: string, context: string): Promise<LLMResponse> {
+async function queryOpenAI(
+  question: string,
+  context: string,
+): Promise<LLMResponse> {
   let OpenAI: new (opts: { apiKey: string }) => OpenAIChatClient;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     OpenAI = (require('openai') as { default: typeof OpenAI }).default;
   } catch {
-    throw new Error('La bibliothèque "openai" n\'est pas installée.\nExécutez : pnpm add openai');
+    throw new Error(
+      'La bibliothèque "openai" n\'est pas installée.\nExécutez : pnpm add openai',
+    );
   }
 
-  const client = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] ?? '' });
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY ?? '' });
   const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `CONTEXTE :\n${context}\n\nQUESTION : ${question}` },
+      {
+        role: 'user',
+        content: `CONTEXTE :\n${context}\n\nQUESTION : ${question}`,
+      },
     ],
     temperature: 0.2,
     max_tokens: 700,
@@ -107,9 +121,12 @@ async function queryOpenAI(question: string, context: string): Promise<LLMRespon
 
 // ── Mode Ollama ───────────────────────────────────────────────────────────────
 
-async function queryOllama(question: string, context: string): Promise<LLMResponse> {
-  const host = process.env['OLLAMA_HOST'] ?? 'http://localhost:11434';
-  const model = process.env['OLLAMA_MODEL'] ?? 'llama3';
+async function queryOllama(
+  question: string,
+  context: string,
+): Promise<LLMResponse> {
+  const host = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
+  const model = process.env.OLLAMA_MODEL ?? 'llama3';
 
   const body = JSON.stringify({
     model,
@@ -124,7 +141,7 @@ async function queryOllama(question: string, context: string): Promise<LLMRespon
   });
 
   if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
-  const data = await response.json() as { response: string };
+  const data = (await response.json()) as { response: string };
 
   return {
     answer: data.response.trim(),
@@ -135,9 +152,11 @@ async function queryOllama(question: string, context: string): Promise<LLMRespon
 
 /** Vérifie si Ollama est accessible. */
 async function isOllamaAvailable(): Promise<boolean> {
-  const host = process.env['OLLAMA_HOST'] ?? 'http://localhost:11434';
+  const host = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
   try {
-    const res = await fetch(`${host}/api/tags`, { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(`${host}/api/tags`, {
+      signal: AbortSignal.timeout(1500),
+    });
     return res.ok;
   } catch {
     return false;
@@ -163,19 +182,22 @@ function fallbackResponse(context: string): LLMResponse {
  * @param question - Question de l'utilisateur
  * @param context  - Contexte extrait de la KB (sections pertinentes formatées)
  */
-export async function queryLLM(question: string, context: string): Promise<LLMResponse> {
+export async function queryLLM(
+  question: string,
+  context: string,
+): Promise<LLMResponse> {
   // 1. Mistral
-  if (process.env['MISTRAL_API_KEY']) {
+  if (process.env.MISTRAL_API_KEY) {
     return queryMistral(question, context);
   }
 
   // 2. OpenAI
-  if (process.env['OPENAI_API_KEY']) {
+  if (process.env.OPENAI_API_KEY) {
     return queryOpenAI(question, context);
   }
 
   // 3. Ollama (local)
-  if (process.env['OLLAMA_MODEL'] || await isOllamaAvailable()) {
+  if (process.env.OLLAMA_MODEL || (await isOllamaAvailable())) {
     try {
       return await queryOllama(question, context);
     } catch {

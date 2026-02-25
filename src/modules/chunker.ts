@@ -15,7 +15,7 @@
  *   - Chunks uniformes → embeddings plus cohérents
  */
 
-import type { RawSection, GameSection } from '../types';
+import type { RawSection } from '../types';
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -49,12 +49,16 @@ function splitIntoSentences(text: string): string[] {
     if (full.length > 0) {
       // Ignore les faux splits (abréviations courantes)
       const lastWord = sentence.trim().split(/\s+/).pop() ?? '';
-      if (/^(M|Mme|Dr|Sr|Jr|etc|ex|vs|p|vol|n°)$/i.test(lastWord.replace(/\.$/, ''))) {
+      if (
+        /^(M|Mme|Dr|Sr|Jr|etc|ex|vs|p|vol|n°)$/i.test(
+          lastWord.replace(/\.$/, ''),
+        )
+      ) {
         // Continue à accumuler
         if (i === 0) {
           sentences.push(full);
         } else if (sentences.length > 0) {
-          sentences[sentences.length - 1] += ' ' + full;
+          sentences[sentences.length - 1] += ` ${full}`;
         }
       } else {
         sentences.push(full);
@@ -62,15 +66,15 @@ function splitIntoSentences(text: string): string[] {
     }
   }
 
-  return sentences.filter(s => s.length > 0);
+  return sentences.filter((s) => s.length > 0);
 }
 
 /** Découpe un texte en paragraphes */
 function splitIntoParagraphs(text: string): string[] {
   return text
     .split(/\n\n+/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
 }
 
 /**
@@ -97,14 +101,6 @@ function buildHierarchyPath(
   }
 
   return path.join(' > ');
-}
-
-/**
- * Extrait les N premiers mots d'un texte
- */
-function takeWords(text: string, maxWords: number): string {
-  const words = text.split(/\s+/);
-  return words.slice(0, maxWords).join(' ');
 }
 
 /**
@@ -139,7 +135,7 @@ export interface Chunk {
 
 /**
  * Découpe une section en chunks intelligents avec overlap.
- * 
+ *
  * Algorithme :
  *   1. Si section < CHUNK_MIN_WORDS → retourne tel quel (1 chunk)
  *   2. Si section < CHUNK_MAX_WORDS → retourne tel quel (1 chunk)
@@ -149,23 +145,22 @@ export interface Chunk {
  *      c. Si un paragraphe dépasse CHUNK_MAX_WORDS → découpe par phrases
  *      d. Ajoute overlap des derniers mots du chunk précédent
  */
-function chunkSection(
-  section: RawSection,
-  hierarchyPath: string,
-): Chunk[] {
+function chunkSection(section: RawSection, hierarchyPath: string): Chunk[] {
   const wordCount = countWords(section.contenu);
 
   // Cas 1 & 2 : Section petite ou moyenne → 1 chunk
   if (wordCount <= CHUNK_MAX_WORDS) {
-    return [{
-      content: section.contenu,
-      metadata: {
-        chunkIndex: 0,
-        totalChunks: 1,
-        hierarchyPath,
+    return [
+      {
+        content: section.contenu,
+        metadata: {
+          chunkIndex: 0,
+          totalChunks: 1,
+          hierarchyPath,
+        },
+        originalSection: section,
       },
-      originalSection: section,
-    }];
+    ];
   }
 
   // Cas 3 : Section grande → chunking intelligent
@@ -204,7 +199,10 @@ function chunkSection(
         const bufferWords = countWords(sentenceBuffer);
         const sentenceWords = countWords(sentence);
 
-        if (bufferWords + sentenceWords > CHUNK_MAX_WORDS && bufferWords >= CHUNK_MIN_WORDS) {
+        if (
+          bufferWords + sentenceWords > CHUNK_MAX_WORDS &&
+          bufferWords >= CHUNK_MIN_WORDS
+        ) {
           // Flush le buffer
           chunks.push({
             content: sentenceBuffer.trim(),
@@ -215,7 +213,7 @@ function chunkSection(
             },
             originalSection: section,
           });
-          sentenceBuffer = takeLastWords(sentenceBuffer, CHUNK_OVERLAP_WORDS) + ' ' + sentence;
+          sentenceBuffer = `${takeLastWords(sentenceBuffer, CHUNK_OVERLAP_WORDS)} ${sentence}`;
         } else {
           sentenceBuffer += (sentenceBuffer ? ' ' : '') + sentence;
         }
@@ -227,7 +225,10 @@ function chunkSection(
     }
 
     // Paragraphe normal
-    if (currentWords + paraWords > CHUNK_TARGET_WORDS && currentWords >= CHUNK_MIN_WORDS) {
+    if (
+      currentWords + paraWords > CHUNK_TARGET_WORDS &&
+      currentWords >= CHUNK_MIN_WORDS
+    ) {
       // Flush le chunk actuel
       chunks.push({
         content: currentContent.trim(),
@@ -239,7 +240,8 @@ function chunkSection(
         originalSection: section,
       });
       overlapBuffer = takeLastWords(currentContent, CHUNK_OVERLAP_WORDS);
-      currentContent = overlapBuffer + (overlapBuffer ? '\n\n' : '') + paragraph;
+      currentContent =
+        overlapBuffer + (overlapBuffer ? '\n\n' : '') + paragraph;
     } else {
       currentContent += (currentContent ? '\n\n' : '') + paragraph;
     }
@@ -258,11 +260,11 @@ function chunkSection(
     });
   } else if (chunks.length > 0) {
     // Trop petit → fusionne avec le dernier chunk
-    chunks[chunks.length - 1].content += '\n\n' + currentContent;
+    chunks[chunks.length - 1].content += `\n\n${currentContent}`;
   }
 
   // Met à jour totalChunks
-  chunks.forEach(chunk => {
+  chunks.forEach((chunk) => {
     chunk.metadata.totalChunks = chunks.length;
   });
 
@@ -271,7 +273,7 @@ function chunkSection(
 
 /**
  * Découpe toutes les sections en chunks avec hiérarchie préservée.
- * 
+ *
  * @param sections - Sections brutes du parseSections()
  * @returns Array de chunks avec métadonnées enrichies
  */
@@ -291,9 +293,9 @@ export function chunkSections(sections: RawSection[]): Chunk[] {
 /**
  * Enrichit un chunk avec le contexte hiérarchique dans son contenu.
  * Ajoute un préambule avec le chemin de navigation.
- * 
+ *
  * Utile pour améliorer la qualité des embeddings et la compréhension LLM.
- * 
+ *
  * @param chunk - Chunk à enrichir
  * @param includeMetadata - Si true, ajoute des métadonnées en préambule
  * @returns Contenu enrichi prêt pour l'embedding
@@ -346,7 +348,7 @@ export function getChunkingStats(chunks: Chunk[]): {
     };
   }
 
-  const wordCounts = chunks.map(c => countWords(c.content));
+  const wordCounts = chunks.map((c) => countWords(c.content));
   const totalWords = wordCounts.reduce((a, b) => a + b, 0);
 
   return {
@@ -354,6 +356,6 @@ export function getChunkingStats(chunks: Chunk[]): {
     avgWordsPerChunk: Math.round(totalWords / chunks.length),
     minWords: Math.min(...wordCounts),
     maxWords: Math.max(...wordCounts),
-    chunksWithOverlap: chunks.filter(c => c.metadata.chunkIndex > 0).length,
+    chunksWithOverlap: chunks.filter((c) => c.metadata.chunkIndex > 0).length,
   };
 }

@@ -1,8 +1,8 @@
 /**
  * files/[...path]/+server.ts — Endpoint pour servir les fichiers uploadés
- * 
+ *
  * Permet aux utilisateurs de télécharger les fichiers sources des jeux.
- * 
+ *
  * Exemple : GET /files/uploads/7-wonders/1709123456789_regles.pdf
  */
 

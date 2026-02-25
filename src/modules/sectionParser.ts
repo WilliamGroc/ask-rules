@@ -27,15 +27,15 @@ import type { RawSection, GameSectionType } from '../types';
 // ── Constantes de découpage ───────────────────────────────────────────────────
 
 /** Nombre minimal de mots de contenu qui doivent suivre un titre pour le valider. */
-const MIN_LOOKAHEAD_WORDS = 10;  // Réduit pour pdfreader - découpage plus fin
+const MIN_LOOKAHEAD_WORDS = 10; // Réduit pour pdfreader - découpage plus fin
 /** Sections avec moins de mots sont écartées (artefacts, listes de 1-2 mots). */
-const MIN_SECTION_WORDS = 15;    // Réduit pour permettre des sections plus petites
+const MIN_SECTION_WORDS = 15; // Réduit pour permettre des sections plus petites
 /** Sections avec moins de mots sont fusionnées dans la précédente. */
-const MERGE_THRESHOLD = 25;      // Réduit pour éviter de fusionner trop de sections
+const MERGE_THRESHOLD = 25; // Réduit pour éviter de fusionner trop de sections
 /** Sections avec plus de mots sont découpées par paragraphes. */
-const MAX_SECTION_WORDS = 350;   // Réduit de 600 pour un découpage plus fin
+const MAX_SECTION_WORDS = 350; // Réduit de 600 pour un découpage plus fin
 /** Taille cible d'un chunk lors de la division (en mots). */
-const CHUNK_TARGET_WORDS = 200;  // Réduit de 400 pour des chunks plus petits
+const CHUNK_TARGET_WORDS = 200; // Réduit de 400 pour des chunks plus petits
 
 // ── Filtrage de lignes parasites ──────────────────────────────────────────────
 
@@ -52,8 +52,8 @@ const NOISE_LINE = /^([=\-*#~_]{3,}|Page\s+\d+|[hH\d\s]{1,12}|[^\w]{1,3})$/i;
 
 function isNoiseLine(line: string): boolean {
   const t = line.trim();
-  if (t.length === 0) return false;   // blank lines are handled separately
-  if (t.length <= 2) return true;     // "H", "h", "2", ";", "—", ") "
+  if (t.length === 0) return false; // blank lines are handled separately
+  if (t.length <= 2) return true; // "H", "h", "2", ";", "—", ") "
 
   // Filtre les patterns de bruit standard
   if (NOISE_LINE.test(t)) return true;
@@ -62,8 +62,8 @@ function isNoiseLine(line: string): boolean {
   // Ex: "23HhHh" a 2 lettres sur 6 chars, "6 7" a 0 lettres sur 3 chars
   const alphaCount = (t.match(/[a-zàâéèêëîïôùûüç]/gi) || []).length;
   const totalNonSpace = t.replace(/\s/g, '').length;
-  if (totalNonSpace >= 3 && alphaCount < 2) return true;  // moins de 2 lettres
-  if (totalNonSpace >= 4 && alphaCount / totalNonSpace < 0.3) return true;  // < 30% de lettres
+  if (totalNonSpace >= 3 && alphaCount < 2) return true; // moins de 2 lettres
+  if (totalNonSpace >= 4 && alphaCount / totalNonSpace < 0.3) return true; // < 30% de lettres
 
   return false;
 }
@@ -76,25 +76,82 @@ function isNoiseLine(line: string): boolean {
  */
 const CONTENT_FIRST_WORDS = new Set([
   // Articles
-  'le', 'la', 'les', 'l', 'un', 'une', 'des', 'du', 'de',
+  'le',
+  'la',
+  'les',
+  'l',
+  'un',
+  'une',
+  'des',
+  'du',
+  'de',
   // Prépositions
-  'au', 'aux', 'en', 'dans', 'à', 'a', 'pour', 'par', 'avec', 'sans',
-  'vers', 'chez', 'depuis', 'lors', 'après', 'avant', 'pendant',
+  'au',
+  'aux',
+  'en',
+  'dans',
+  'à',
+  'a',
+  'pour',
+  'par',
+  'avec',
+  'sans',
+  'vers',
+  'chez',
+  'depuis',
+  'lors',
+  'après',
+  'avant',
+  'pendant',
   // Pronoms personnels / démonstratifs
-  'il', 'elle', 'ils', 'elles', 'on', 'ce', 'cet', 'cette', 'ces',
-  'son', 'sa', 'ses', 'mon', 'ma', 'ton', 'ta',
+  'il',
+  'elle',
+  'ils',
+  'elles',
+  'on',
+  'ce',
+  'cet',
+  'cette',
+  'ces',
+  'son',
+  'sa',
+  'ses',
+  'mon',
+  'ma',
+  'ton',
+  'ta',
   // Conjonctions
-  'et', 'ou', 'mais', 'donc', 'or', 'ni', 'car', 'si',
-  'que', 'qui', 'lorsque', 'quand', 'comme', 'puisque', 'car',
+  'et',
+  'ou',
+  'mais',
+  'donc',
+  'or',
+  'ni',
+  'car',
+  'si',
+  'que',
+  'qui',
+  'lorsque',
+  'quand',
+  'comme',
+  'puisque',
+  'car',
   // Négation
-  'ne', 'pas', 'non',
+  'ne',
+  'pas',
+  'non',
   // Adverbes ou introducteurs de phrase
-  'c', 'j', 'y', 'voici', 'voilà', 'notamment',
+  'c',
+  'j',
+  'y',
+  'voici',
+  'voilà',
+  'notamment',
 ]);
 
 /** Retourne le premier mot (minuscule, sans ponctuation) d'un texte. */
 function firstWord(text: string): string {
-  return (text.split(/[\s,.:;!?()\[\]«»"']+/)[0] ?? '').toLowerCase();
+  return (text.split(/[\s,.:;!?()[\]«»"']+/)[0] ?? '').toLowerCase();
 }
 
 /** True si la ligne démarre clairement par un contenu (article, pronom…). */
@@ -110,7 +167,7 @@ function isContentStarter(text: string): boolean {
  */
 function isVerbStarter(text: string): boolean {
   const fw = text.split(/\s+/)[0] ?? '';
-  if (/oire$|aire$|ière$/i.test(fw)) return false;   // noms/adj courants, pas des verbes
+  if (/oire$|aire$|ière$/i.test(fw)) return false; // noms/adj courants, pas des verbes
   return /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ][a-zàâéèêëîïôùûü]{2,}(ez|er|ir|oir|re)$/u.test(fw);
 }
 
@@ -131,8 +188,8 @@ function wordCount(text: string): number {
 function normalizeTitle(raw: string): string {
   return raw
     .replace(/\s*:\s*$/, '')
-    .replace(/\s*\(\s*\)\s*/g, ' ')  // parenthèses vides : "FRANCE II ()" → "FRANCE II"
-    .replace(/\s*\([^)]*$/, '')       // parenthèse ouverte non fermée : "R&D (" → "R&D"
+    .replace(/\s*\(\s*\)\s*/g, ' ') // parenthèses vides : "FRANCE II ()" → "FRANCE II"
+    .replace(/\s*\([^)]*$/, '') // parenthèse ouverte non fermée : "R&D (" → "R&D"
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -153,7 +210,7 @@ function isTrivialTitle(title: string): boolean {
  */
 function isAllCaps(text: string): boolean {
   const alpha = text.replace(/[\s\d\-:/()'"«»''.,!?_]+/g, '');
-  if (alpha.length < 3) return false;   // "VP", "OK" → trop court pour être un titre
+  if (alpha.length < 3) return false; // "VP", "OK" → trop court pour être un titre
   return alpha === alpha.toUpperCase() && alpha !== alpha.toLowerCase();
 }
 
@@ -198,7 +255,7 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
   }
 
   // 3. "Étape N — ..." pattern
-  const etapeMatch = trimmed.match(/^(Étape\s+\d+\s*[—\-]\s*[^:]+?)\s*:?\s*$/i);
+  const etapeMatch = trimmed.match(/^(Étape\s+\d+\s*[—-]\s*[^:]+?)\s*:?\s*$/i);
   if (etapeMatch) {
     const title = normalizeTitle(etapeMatch[1]);
     if (isTrivialTitle(title)) return none;
@@ -207,7 +264,9 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
 
   // 4. "Titre :" heuristique
   //    Conditions : ≤ 6 mots, ne commence pas par article/pronom/verbe, pas de virgule interne
-  const titreColonMatch = trimmed.match(/^([A-ZÀÂÉÈÊËÎÏÔÙÛÜ][^.!?\n]{2,60})\s*:\s*$/);
+  const titreColonMatch = trimmed.match(
+    /^([A-ZÀÂÉÈÊËÎÏÔÙÛÜ][^.!?\n]{2,60})\s*:\s*$/,
+  );
   if (titreColonMatch) {
     const candidate = titreColonMatch[1].trim();
     const wc = wordCount(candidate);
@@ -247,11 +306,12 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
   if (ctx.prevWasBlank) {
     const wc = wordCount(trimmed);
     if (
-      wc >= 1 && wc <= 8 &&
+      wc >= 1 &&
+      wc <= 8 &&
       /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ]/.test(trimmed) &&
       !isContentStarter(trimmed) &&
       !isVerbStarter(trimmed) &&
-      !/[.!?;(]$/.test(trimmed) &&         // '(' final = fragment (R&D ()
+      !/[.!?;(]$/.test(trimmed) && // '(' final = fragment (R&D ()
       !trimmed.includes(', ')
     ) {
       const title = normalizeTitle(trimmed);
@@ -266,12 +326,13 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
   //    Plus restrictif : doit être très court et significatif
   const wc = wordCount(trimmed);
   if (
-    wc >= 1 && wc <= 3 &&
-    trimmed.length >= 4 &&              // minimum 4 caractères
-    /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ][a-zàâéèêëîïôùûüç\s]+$/.test(trimmed) &&  // commence par maj, suivi de minuscules
+    wc >= 1 &&
+    wc <= 3 &&
+    trimmed.length >= 4 && // minimum 4 caractères
+    /^[A-ZÀÂÉÈÊËÎÏÔÙÛÜ][a-zàâéèêëîïôùûüç\s]+$/.test(trimmed) && // commence par maj, suivi de minuscules
     !isContentStarter(trimmed) &&
     !isVerbStarter(trimmed) &&
-    !/[.!?;,:(]$/.test(trimmed)        // pas de ponctuation finale
+    !/[.!?;,:(]$/.test(trimmed) // pas de ponctuation finale
   ) {
     const title = normalizeTitle(trimmed);
     if (!isTrivialTitle(title)) {
@@ -301,7 +362,9 @@ function detectHeading(line: string, ctx: DetectContext): HeadingResult {
  *
  * Retourne null si les conditions ne sont pas remplies.
  */
-function splitInlineTitleLine(line: string): { title: string; content: string } | null {
+function splitInlineTitleLine(
+  line: string,
+): { title: string; content: string } | null {
   const sepIdx = line.indexOf(' : ');
   if (sepIdx < 0) return null;
 
@@ -329,7 +392,10 @@ function splitInlineTitleLine(line: string): { title: string; content: string } 
  */
 export function classifySection(titre: string, contenu = ''): GameSectionType {
   const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
 
   const t = normalize(titre);
   const c = normalize(contenu.slice(0, 400));
@@ -337,38 +403,57 @@ export function classifySection(titre: string, contenu = ''): GameSectionType {
   if (
     /presentation|introduction|idee.?du.?jeu|contexte|propos/.test(t) ||
     /^ce jeu |^dans ce jeu|bienvenue|il etait une fois/.test(c)
-  ) return 'presentation';
+  )
+    return 'presentation';
 
   if (
     /but.?du.?jeu|objectif|remporter|gagner.?partie/.test(t) ||
     /le but est|pour gagner|pour remporter|condition.{0,10}victoire/.test(c)
-  ) return 'but_du_jeu';
+  )
+    return 'but_du_jeu';
 
   if (
     /materiel|composant|contenu.?boite|piece|hex|tuile|plateau/.test(t) ||
-    /dans la boite|contient\s*:|\bx\d|\d\s*x\s*(carte|jeton|tuile|pion|cube)/.test(c)
-  ) return 'materiel';
+    /dans la boite|contient\s*:|\bx\d|\d\s*x\s*(carte|jeton|tuile|pion|cube)/.test(
+      c,
+    )
+  )
+    return 'materiel';
 
   if (
     /mise.?en.?place|preparation|demarrage|avant.?partie|setup/.test(t) ||
-    /avant le premier tour|pour commencer|pour preparer|placez le plateau/.test(c)
-  ) return 'preparation';
+    /avant le premier tour|pour commencer|pour preparer|placez le plateau/.test(
+      c,
+    )
+  )
+    return 'preparation';
 
   if (
-    /tour.?de.?jeu|deroulement|phase|action|recrut|construir|attaqu|commerc|passer|mecanique/.test(t) ||
-    /a son tour|pendant son tour|le joueur actif|chaque joueur (peut|doit)/.test(c)
-  ) return 'tour_de_jeu';
+    /tour.?de.?jeu|deroulement|phase|action|recrut|construir|attaqu|commerc|passer|mecanique/.test(
+      t,
+    ) ||
+    /a son tour|pendant son tour|le joueur actif|chaque joueur (peut|doit)/.test(
+      c,
+    )
+  )
+    return 'tour_de_jeu';
 
   if (/carte.?evenement|evenement/.test(t)) return 'cartes_evenement';
 
   if (
-    /regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(t)
-  ) return 'regles_speciales';
+    /regle.?speciale|exception|cas.?particulier|surpopulation|alliance|territoire.?neutre/.test(
+      t,
+    )
+  )
+    return 'regles_speciales';
 
   if (
     /condition.?victoire|fin.?partie|decompte|score|gagnant|victoire/.test(t) ||
-    /la partie se termine|decompte final|calculez les points|comptez les points/.test(c)
-  ) return 'victoire';
+    /la partie se termine|decompte final|calculez les points|comptez les points/.test(
+      c,
+    )
+  )
+    return 'victoire';
 
   if (/variante|mode.?cooper|optionnel|coop/.test(t)) return 'variante';
 
@@ -391,7 +476,10 @@ export function classifySection(titre: string, contenu = ''): GameSectionType {
  * @param rawText      - Texte extrait du fichier (PDF ou TXT)
  * @param documentName - Nom du document (titre de la section racine)
  */
-export function parseSections(rawText: string, documentName = 'Jeu'): RawSection[] {
+export function parseSections(
+  rawText: string,
+  documentName = 'Jeu',
+): RawSection[] {
   const rawLines = rawText.split(/\r?\n/);
 
   // ── Phase 1 : Parsing ligne par ligne ────────────────────────────────────────
@@ -402,9 +490,9 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
   let currentContent: string[] = [];
   let prevWasBlank = true;
 
-  let currentPage: number | undefined = undefined;
-  let sectionPage: number | undefined = undefined;
-  let lastContentPage: number | undefined = undefined;
+  let currentPage: number | undefined;
+  let sectionPage: number | undefined;
+  let lastContentPage: number | undefined;
 
   const flushSection = () => {
     const content = currentContent.join('\n').trim();
@@ -446,7 +534,9 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
       }
     }
 
-    const { isHeading, title, niveau } = detectHeading(rawLine, { prevWasBlank });
+    const { isHeading, title, niveau } = detectHeading(rawLine, {
+      prevWasBlank,
+    });
 
     if (isHeading) {
       flushSection();
@@ -477,11 +567,14 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
       // Rétrogradation : fusionner avec la section précédente
       if (pass2.length > 0) {
         const prev = pass2[pass2.length - 1];
-        prev.contenu = prev.contenu + '\n\n' + section.titre + '\n' + section.contenu;
+        prev.contenu = `${prev.contenu}\n\n${section.titre}\n${section.contenu}`;
         prev.page_fin = section.page_fin ?? prev.page_fin;
       } else {
         // Aucune section précédente : promouvoir le titre en contenu
-        pass2.push({ ...section, contenu: section.titre + '\n' + section.contenu });
+        pass2.push({
+          ...section,
+          contenu: `${section.titre}\n${section.contenu}`,
+        });
       }
     } else {
       pass2.push({ ...section });
@@ -496,7 +589,7 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
 
     if (wc < MERGE_THRESHOLD && pass3.length > 0) {
       const prev = pass3[pass3.length - 1];
-      prev.contenu = prev.contenu + '\n\n' + section.titre + '\n' + section.contenu;
+      prev.contenu = `${prev.contenu}\n\n${section.titre}\n${section.contenu}`;
       prev.page_fin = section.page_fin ?? prev.page_fin;
     } else {
       pass3.push({ ...section });
@@ -515,8 +608,8 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
 
     const paragraphs = section.contenu
       .split(/\n{2,}/)
-      .map(p => p.trim())
-      .filter(p => p.length > 0);
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
 
     let chunkParagraphs: string[] = [];
     let chunkWords = 0;
@@ -540,7 +633,10 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
     for (const para of paragraphs) {
       const paraWords = wordCount(para);
 
-      if (chunkWords + paraWords > CHUNK_TARGET_WORDS && chunkParagraphs.length > 0) {
+      if (
+        chunkWords + paraWords > CHUNK_TARGET_WORDS &&
+        chunkParagraphs.length > 0
+      ) {
         emitChunk();
         // Overlap : conserver le dernier paragraphe du chunk pour le contexte
         const overlap = chunkParagraphs[chunkParagraphs.length - 1] ?? '';
@@ -557,5 +653,5 @@ export function parseSections(rawText: string, documentName = 'Jeu'): RawSection
   }
 
   // ── Filtre final : écarter les sections inférieures à MIN_SECTION_WORDS ───────
-  return result.filter(s => wordCount(s.contenu) >= MIN_SECTION_WORDS);
+  return result.filter((s) => wordCount(s.contenu) >= MIN_SECTION_WORDS);
 }

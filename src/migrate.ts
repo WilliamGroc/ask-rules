@@ -82,7 +82,9 @@ async function migrate(): Promise<void> {
         ADD COLUMN IF NOT EXISTS chunk_index    INTEGER NOT NULL DEFAULT 0,
         ADD COLUMN IF NOT EXISTS total_chunks   INTEGER NOT NULL DEFAULT 1
     `);
-    console.log('✔ Colonnes hierarchy_path / chunk_index / total_chunks présentes');
+    console.log(
+      '✔ Colonnes hierarchy_path / chunk_index / total_chunks présentes',
+    );
 
     // ── Colonne full-text search (v3) ──────────────────────────────────────────
     await client.query(`
@@ -152,7 +154,7 @@ async function migrate(): Promise<void> {
   }
 }
 
-migrate().catch(err => {
+migrate().catch((err) => {
   console.error('✖  Erreur migration :', err.message ?? err);
   process.exit(1);
 });

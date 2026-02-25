@@ -15,7 +15,7 @@
  *   ✅ Découpage intelligent (fin de phrase au lieu de slice brut)
  */
 
-import type { ScoredSection, StoredSection } from '../types';
+import type { ScoredSection } from '../types';
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -56,10 +56,10 @@ function truncateAtSentence(text: string, maxChars: number): string {
   // Sinon, coupe au dernier espace pour éviter de couper un mot
   const lastSpace = truncated.lastIndexOf(' ');
   if (lastSpace > maxChars * 0.8) {
-    return truncated.slice(0, lastSpace).trim() + '…';
+    return `${truncated.slice(0, lastSpace).trim()}…`;
   }
 
-  return truncated.trim() + '…';
+  return `${truncated.trim()}…`;
 }
 
 /**
@@ -104,9 +104,13 @@ function buildSectionContext(
 
   // ── En-tête de section ────────────────────────────────────────────────────
 
-  lines.push(`╔═══════════════════════════════════════════════════════════════════════`);
+  lines.push(
+    `╔═══════════════════════════════════════════════════════════════════════`,
+  );
   lines.push(`║ SECTION ${index + 1} — Pertinence : ${formatScore(score)}`);
-  lines.push(`╠═══════════════════════════════════════════════════════════════════════`);
+  lines.push(
+    `╠═══════════════════════════════════════════════════════════════════════`,
+  );
 
   // ── Métadonnées de base ───────────────────────────────────────────────────
 
@@ -147,7 +151,9 @@ function buildSectionContext(
     lines.push(`║ Mécaniques    : ${mecaniques}`);
   }
 
-  lines.push(`╚═══════════════════════════════════════════════════════════════════════`);
+  lines.push(
+    `╚═══════════════════════════════════════════════════════════════════════`,
+  );
 
   // ── Résumé (si disponible) ────────────────────────────────────────────────
 
@@ -201,9 +207,13 @@ export function buildEnrichedContext(
 
   // ── En-tête global ────────────────────────────────────────────────────────
 
-  lines.push('═════════════════════════════════════════════════════════════════════════');
+  lines.push(
+    '═════════════════════════════════════════════════════════════════════════',
+  );
   lines.push(`  CONTEXTE ENRICHI — ${gameName.toUpperCase()}`);
-  lines.push('═════════════════════════════════════════════════════════════════════════');
+  lines.push(
+    '═════════════════════════════════════════════════════════════════════════',
+  );
 
   // ── Métadonnées du jeu ────────────────────────────────────────────────────
 
@@ -237,7 +247,9 @@ export function buildEnrichedContext(
   }
 
   lines.push('');
-  lines.push(`📚 ${sections.length} section${sections.length > 1 ? 's' : ''} pertinente${sections.length > 1 ? 's' : ''} trouvée${sections.length > 1 ? 's' : ''} :`);
+  lines.push(
+    `📚 ${sections.length} section${sections.length > 1 ? 's' : ''} pertinente${sections.length > 1 ? 's' : ''} trouvée${sections.length > 1 ? 's' : ''} :`,
+  );
   lines.push('');
 
   // ── Sections détaillées ───────────────────────────────────────────────────
@@ -253,9 +265,13 @@ export function buildEnrichedContext(
   // ── Pied de page ──────────────────────────────────────────────────────────
 
   lines.push('');
-  lines.push('═════════════════════════════════════════════════════════════════════════');
+  lines.push(
+    '═════════════════════════════════════════════════════════════════════════',
+  );
   lines.push('  FIN DU CONTEXTE');
-  lines.push('═════════════════════════════════════════════════════════════════════════');
+  lines.push(
+    '═════════════════════════════════════════════════════════════════════════',
+  );
 
   return lines.join('\n');
 }
@@ -264,10 +280,7 @@ export function buildEnrichedContext(
  * Version simplifiée du contexte (format compact, sans boxes).
  * Utile si le contexte enrichi est too verbose pour certains LLMs.
  */
-export function buildCompactContext(
-  sections: ScoredSection[],
-  gameName: string,
-): string {
+export function buildCompactContext(sections: ScoredSection[]): string {
   if (sections.length === 0) {
     return 'Aucune section pertinente trouvée.';
   }
@@ -287,7 +300,10 @@ export function buildCompactContext(
       }
 
       // Chunking si disponible
-      if (section.chunk_index !== undefined && section.total_chunks !== undefined) {
+      if (
+        section.chunk_index !== undefined &&
+        section.total_chunks !== undefined
+      ) {
         parts.push(`Chunk ${section.chunk_index + 1}/${section.total_chunks}`);
       }
 
@@ -337,7 +353,7 @@ export function buildContext(
   const { format = 'enriched', gameMetadata } = options;
 
   if (format === 'compact') {
-    return buildCompactContext(sections, gameName);
+    return buildCompactContext(sections);
   }
 
   return buildEnrichedContext(sections, gameName, gameMetadata);

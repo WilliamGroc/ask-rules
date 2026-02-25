@@ -9,13 +9,12 @@
  *   uploads/catan/1709123789012_rules-fr.pdf
  */
 
-import fs from 'fs';
-import path from 'path';
-import { slugify } from './knowledgeBase';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /** Répertoire racine pour tous les uploads */
 const UPLOADS_DIR = path.resolve(
-  process.env.UPLOADS_DIR ?? path.join(process.cwd(), 'uploads')
+  process.env.UPLOADS_DIR ?? path.join(process.cwd(), 'uploads'),
 );
 
 /**
@@ -41,7 +40,7 @@ export function getGameUploadDir(gameSlug: string): string {
 
 /**
  * Sauvegarde un fichier dans le répertoire du jeu.
- * 
+ *
  * @param gameSlug - Slug du jeu (ex: "7-wonders")
  * @param originalFilename - Nom du fichier original (ex: "regles.pdf")
  * @param content - Contenu du fichier (Buffer ou Uint8Array)
@@ -73,7 +72,7 @@ export function saveUploadedFile(
 
 /**
  * Copie un fichier temporaire vers le stockage permanent.
- * 
+ *
  * @param tmpPath - Chemin du fichier temporaire
  * @param gameSlug - Slug du jeu
  * @param originalFilename - Nom du fichier original
@@ -90,7 +89,7 @@ export function moveToStorage(
 
 /**
  * Retourne le chemin absolu d'un fichier stocké.
- * 
+ *
  * @param relativePath - Chemin relatif (ex: "uploads/7-wonders/1709123456789_regles.pdf")
  * @returns Chemin absolu
  */
@@ -122,9 +121,10 @@ export function listGameFiles(gameSlug: string): string[] {
   const gameDir = path.join(UPLOADS_DIR, gameSlug);
   if (!fs.existsSync(gameDir)) return [];
 
-  return fs.readdirSync(gameDir)
-    .filter(f => !f.startsWith('.'))
-    .map(f => path.join('uploads', gameSlug, f));
+  return fs
+    .readdirSync(gameDir)
+    .filter((f) => !f.startsWith('.'))
+    .map((f) => path.join('uploads', gameSlug, f));
 }
 
 /**
@@ -167,6 +167,7 @@ export function getTotalStorageSize(): number {
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }

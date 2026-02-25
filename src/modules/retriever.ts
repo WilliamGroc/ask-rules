@@ -21,7 +21,7 @@
 
 import pool from './db';
 import { generateEmbedding } from './embedder';
-import { hybridSearch, hybridSearchForGame, hybridSearchBestGame } from './hybridSearch';
+import { hybridSearchForGame, hybridSearchBestGame } from './hybridSearch';
 import type { ScoredSection, StoredSection } from '../types';
 
 /** Résultat de la sélection d'un jeu pour une requête donnée. */
@@ -52,10 +52,15 @@ export interface RetrievalOptions {
 /** Vérifie si le nom d'un jeu est mentionné dans la question. */
 function gameNameInQuery(gameName: string, query: string): boolean {
   const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   const queryNorm = normalize(query);
-  const nameWords = normalize(gameName).split(/\s+/).filter(w => w.length >= 5);
-  return nameWords.some(w => queryNorm.includes(w));
+  const nameWords = normalize(gameName)
+    .split(/\s+/)
+    .filter((w) => w.length >= 5);
+  return nameWords.some((w) => queryNorm.includes(w));
 }
 
 /** Formate un vecteur dense pour pgvector : "[n1,n2,...]" */
@@ -120,7 +125,7 @@ export async function retrieveFromBestGame(
 /**
  * Recherche des sections pour une question dans un jeu spécifique.
  * Le jeu est identifié par correspondance partielle sur le nom (insensible à la casse).
- * 
+ *
  * @param query - Question utilisateur
  * @param gameName - Nom partiel ou complet du jeu
  * @param topN - Nombre de sections à retourner
@@ -134,13 +139,16 @@ export async function retrieveForGame(
 ): Promise<GameSelection | null> {
   // Résout le gameId depuis le nom
   const normalize = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   const needle = normalize(gameName);
 
   const res = await pool.query<{ id: string; jeu: string }>(
     'SELECT id, jeu FROM games',
   );
-  const match = res.rows.find(g => normalize(g.jeu).includes(needle));
+  const match = res.rows.find((g) => normalize(g.jeu).includes(needle));
   if (!match) return null;
 
   // Si hybrid search activé
@@ -160,7 +168,14 @@ export async function retrieveForGame(
   // Sinon, mode dense
   const queryEmbedding = await generateEmbedding(query);
   const vectorLiteral = toVectorLiteral(queryEmbedding);
-  return searchWithinGame(match.id, match.jeu, vectorLiteral, topN, 0.01, false);
+  return searchWithinGame(
+    match.id,
+    match.jeu,
+    vectorLiteral,
+    topN,
+    0.01,
+    false,
+  );
 }
 
 // ── Implémentation Dense (Legacy) ─────────────────────────────────────────────
@@ -195,7 +210,7 @@ async function _retrieveFromBestGameDense(
     targetGameId = games[0].id;
   } else {
     // Priorité 2 : nom du jeu dans la question
-    const named = games.find(g => gameNameInQuery(g.jeu, query));
+    const named = games.find((g) => gameNameInQuery(g.jeu, query));
     if (named) {
       targetGameId = named.id;
       matchedName = true;
@@ -206,7 +221,7 @@ async function _retrieveFromBestGameDense(
     // Recherche directement dans le jeu ciblé
     return searchWithinGame(
       targetGameId,
-      games.find(g => g.id === targetGameId)!.jeu,
+      games.find((g) => g.id === targetGameId)!.jeu,
       vectorLiteral,
       topN,
       minScore,
@@ -303,7 +318,7 @@ async function selectBestGameByScore(
   }
 
   const bestSections = byGame.get(bestGameId)!;
-  const bestGame = games.find(g => g.id === bestGameId)!;
+  const bestGame = games.find((g) => g.id === bestGameId)!;
 
   return {
     jeu: bestGame.jeu,

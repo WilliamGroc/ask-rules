@@ -21,11 +21,16 @@
 
 import 'dotenv/config';
 
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { RequestHandler } from './$types';
-import { openSectionWriter, gameExists, countSections, slugify } from '../../../modules/knowledgeBase';
+import {
+  openSectionWriter,
+  gameExists,
+  countSections,
+  slugify,
+} from '../../../modules/knowledgeBase';
 import { generateEmbeddingForSection } from '../../../modules/embedder';
 import { analyseFile } from '../../../pipeline';
 import { saveUploadedFile } from '../../../modules/fileStorage';
@@ -64,7 +69,9 @@ function htmlToText(html: string): string {
  * Retourne le chemin du fichier temporaire et le nom de fichier dérivé de l'URL.
  * L'appelant est responsable de supprimer le fichier temporaire.
  */
-async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename: string }> {
+async function fetchUrlToTemp(
+  url: string,
+): Promise<{ tmpPath: string; filename: string }> {
   const parsed = new URL(url);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('Seules les URLs http:// et https:// sont supportées.');
@@ -76,7 +83,9 @@ async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename:
   });
 
   if (!response.ok) {
-    throw new Error(`Le serveur a répondu ${response.status} — ${response.statusText}`);
+    throw new Error(
+      `Le serveur a répondu ${response.status} — ${response.statusText}`,
+    );
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -89,7 +98,11 @@ async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename:
   if (isPdf) {
     ext = '.pdf';
     content = Buffer.from(await response.arrayBuffer());
-  } else if (contentType.includes('text/html') || urlExt === '.html' || urlExt === '.htm') {
+  } else if (
+    contentType.includes('text/html') ||
+    urlExt === '.html' ||
+    urlExt === '.htm'
+  ) {
     ext = '.txt';
     content = Buffer.from(htmlToText(await response.text()), 'utf-8');
   } else {
@@ -101,7 +114,8 @@ async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename:
   fs.writeFileSync(tmpPath, new Uint8Array(content));
 
   // Nom de fichier lisible : chemin URL ou hostname
-  const basename = path.basename(parsed.pathname).replace(/[?#].*$/, '') || parsed.hostname;
+  const basename =
+    path.basename(parsed.pathname).replace(/[?#].*$/, '') || parsed.hostname;
   const filename = basename.endsWith(ext) ? basename : basename + ext;
 
   return { tmpPath, filename };
@@ -123,8 +137,12 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         const formData = await request.formData();
         const gameName = String(formData.get('gameName') ?? '').trim();
-        const mode = String(formData.get('mode') ?? 'replace') as 'replace' | 'merge';
-        const importMode = String(formData.get('importMode') ?? 'file') as 'file' | 'url';
+        const mode = String(formData.get('mode') ?? 'replace') as
+          | 'replace'
+          | 'merge';
+        const importMode = String(formData.get('importMode') ?? 'file') as
+          | 'file'
+          | 'url';
 
         const gameSlug = slugify(gameName);
         let sourceFilename = '';
@@ -141,23 +159,35 @@ export const POST: RequestHandler = async ({ request }) => {
         if (importMode === 'url') {
           const urlInput = String(formData.get('url') ?? '').trim();
           if (!urlInput) {
-            send({ type: 'error', message: 'L\'URL est requise.' });
+            send({ type: 'error', message: "L'URL est requise." });
             return;
           }
 
           // Validation format URL
-          try { new URL(urlInput); } catch {
-            send({ type: 'error', message: 'URL invalide. Exemple : https://exemple.com/regles.pdf' });
+          try {
+            new URL(urlInput);
+          } catch {
+            send({
+              type: 'error',
+              message: 'URL invalide. Exemple : https://exemple.com/regles.pdf',
+            });
             return;
           }
 
-          send({ type: 'step', message: `Téléchargement depuis ${new URL(urlInput).hostname}…` });
-          ({ tmpPath, filename: sourceFilename } = await fetchUrlToTemp(urlInput));
+          send({
+            type: 'step',
+            message: `Téléchargement depuis ${new URL(urlInput).hostname}…`,
+          });
+          ({ tmpPath, filename: sourceFilename } =
+            await fetchUrlToTemp(urlInput));
 
           // Sauvegarde permanente du fichier téléchargé
           const urlContent = fs.readFileSync(tmpPath);
-          storedFilePath = saveUploadedFile(gameSlug, sourceFilename, urlContent);
-
+          storedFilePath = saveUploadedFile(
+            gameSlug,
+            sourceFilename,
+            urlContent,
+          );
         } else {
           // ── Mode fichier (comportement d'origine) ─────────────────────────
           const fichier = formData.get('fichier') as File | null;
@@ -167,7 +197,10 @@ export const POST: RequestHandler = async ({ request }) => {
           }
           const ext = path.extname(fichier.name).toLowerCase();
           if (ext !== '.txt' && ext !== '.pdf') {
-            send({ type: 'error', message: 'Format non supporté. Utilisez .txt ou .pdf.' });
+            send({
+              type: 'error',
+              message: 'Format non supporté. Utilisez .txt ou .pdf.',
+            });
             return;
           }
           tmpPath = path.join(os.tmpdir(), `ask-rules-${Date.now()}${ext}`);
@@ -176,12 +209,19 @@ export const POST: RequestHandler = async ({ request }) => {
           sourceFilename = fichier.name;
 
           // Sauvegarde permanente du fichier uploadé
-          storedFilePath = saveUploadedFile(gameSlug, fichier.name, fileContent);
+          storedFilePath = saveUploadedFile(
+            gameSlug,
+            fichier.name,
+            fileContent,
+          );
         }
 
         // ── Extraction + NLP ──────────────────────────────────────────────────
         send({ type: 'step', message: 'Extraction du texte…' });
-        const result = await analyseFile(tmpPath, { withEmbed: false, withChunking: true });
+        const result = await analyseFile(tmpPath, {
+          withEmbed: false,
+          withChunking: true,
+        });
         result.jeu = gameName;
 
         const n = result.sections.length;
@@ -215,7 +255,9 @@ export const POST: RequestHandler = async ({ request }) => {
         try {
           for (let i = 0; i < n; i++) {
             send({ type: 'embedding_progress', current: i + 1, total: n });
-            const embedding = await generateEmbeddingForSection(result.sections[i]);
+            const embedding = await generateEmbeddingForSection(
+              result.sections[i],
+            );
             await writer.insertSection({
               ...result.sections[i],
               section_id: `${gameSlug}_${idOffset + i}`,
@@ -229,7 +271,11 @@ export const POST: RequestHandler = async ({ request }) => {
           throw err;
         }
 
-        const actionLabel = isMerge ? 'fusionné' : alreadyExists ? 'remplacé' : 'ajouté';
+        const actionLabel = isMerge
+          ? 'fusionné'
+          : alreadyExists
+            ? 'remplacé'
+            : 'ajouté';
 
         send({
           type: 'done',
@@ -238,12 +284,18 @@ export const POST: RequestHandler = async ({ request }) => {
           action: actionLabel,
           mecaniques: result.statistiques.mecaniques_detectees,
         });
-
       } catch (e) {
-        send({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+        send({
+          type: 'error',
+          message: e instanceof Error ? e.message : String(e),
+        });
       } finally {
         if (tmpPath) {
-          try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+          try {
+            fs.unlinkSync(tmpPath);
+          } catch {
+            /* ignore */
+          }
         }
         controller.close();
       }
@@ -254,7 +306,7 @@ export const POST: RequestHandler = async ({ request }) => {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 };

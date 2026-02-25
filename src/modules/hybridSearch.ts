@@ -78,7 +78,7 @@ function normalizeQuery(query: string): string {
     .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
     .replace(/[^\w\s]/g, ' ') // Remplace ponctuation par espace
     .split(/\s+/)
-    .filter(w => w.length >= 2)
+    .filter((w) => w.length >= 2)
     .join(' & '); // Opérateur AND pour tsquery
 }
 
@@ -86,7 +86,7 @@ function normalizeQuery(query: string): string {
 
 /**
  * Recherche sémantique via embeddings et pgvector.
- * 
+ *
  * @param query - Question utilisateur
  * @param gameId - ID du jeu (optionnel, null = tous les jeux)
  * @param topK - Nombre de résultats
@@ -126,13 +126,13 @@ async function searchDense(
 
 /**
  * Recherche lexicale via PostgreSQL full-text search (BM25-like).
- * 
+ *
  * Le score ts_rank_cd est normalisé entre 0-1 approximativement.
  * Les poids sont définis dans le tsvector :
  *   - A (titre) : weight 1.0
  *   - B (hierarchy_path) : weight 0.4
  *   - C (contenu) : weight 0.2
- * 
+ *
  * @param query - Question utilisateur
  * @param gameId - ID du jeu (optionnel, null = tous les jeux)
  * @param topK - Nombre de résultats
@@ -177,8 +177,11 @@ async function searchSparse(
   try {
     const res = await pool.query(sql, params);
     // Normalise les scores entre 0-1 (ts_rank_cd peut dépasser 1)
-    const maxScore = Math.max(...res.rows.map(r => parseFloat(r.score ?? '0')), 0.001);
-    return res.rows.map(row => {
+    const maxScore = Math.max(
+      ...res.rows.map((r) => parseFloat(r.score ?? '0')),
+      0.001,
+    );
+    return res.rows.map((row) => {
       const section = rowToScoredSection(row);
       section.score = section.score / maxScore; // Normalisation
       return section;
@@ -193,13 +196,13 @@ async function searchSparse(
 
 /**
  * Fusionne les résultats dense et sparse avec Reciprocal Rank Fusion (RRF).
- * 
+ *
  * RRF est plus robuste que la simple moyenne de scores car :
  *   - Indépendant de l'échelle des scores
  *   - Privilégie les résultats bien classés dans les deux listes
- * 
+ *
  * Score RRF : sum(1 / (k + rank_i)) pour chaque liste
- * 
+ *
  * @param denseResults - Résultats de la recherche dense
  * @param sparseResults - Résultats de la recherche sparse
  * @param topN - Nombre de résultats finaux
@@ -250,13 +253,13 @@ function fuseResultsRRF(
 
 /**
  * Fusionne les résultats dense et sparse avec une moyenne pondérée.
- * 
+ *
  * Méthode alternative à RRF :
  *   - Plus simple
  *   - Dépend de la normalisation des scores
- * 
+ *
  * Score final = DENSE_WEIGHT * score_dense + SPARSE_WEIGHT * score_sparse
- * 
+ *
  * @param denseResults - Résultats de la recherche dense
  * @param sparseResults - Résultats de la recherche sparse
  * @param topN - Nombre de résultats finaux
@@ -271,13 +274,13 @@ function fuseResultsWeighted(
   const scoresMap = new Map<string, [number, number]>();
   const sectionsMap = new Map<string, ScoredSection>();
 
-  denseResults.forEach(result => {
+  denseResults.forEach((result) => {
     const id = result.section.section_id;
     scoresMap.set(id, [result.score, 0]);
     sectionsMap.set(id, result);
   });
 
-  sparseResults.forEach(result => {
+  sparseResults.forEach((result) => {
     const id = result.section.section_id;
     const current = scoresMap.get(id) ?? [0, 0];
     scoresMap.set(id, [current[0], result.score]);
@@ -289,7 +292,8 @@ function fuseResultsWeighted(
   // Calcule le score pondéré
   const merged = Array.from(scoresMap.entries())
     .map(([id, [denseScore, sparseScore]]) => {
-      const finalScore = DENSE_WEIGHT * denseScore + SPARSE_WEIGHT * sparseScore;
+      const finalScore =
+        DENSE_WEIGHT * denseScore + SPARSE_WEIGHT * sparseScore;
       const section = sectionsMap.get(id)!;
       return {
         ...section,
@@ -317,12 +321,12 @@ export interface HybridSearchOptions {
 
 /**
  * Recherche hybride combinant embeddings (dense) et full-text (sparse).
- * 
+ *
  * Pipeline :
  *   1. Recherche dense (top 20) → scores sémantiques
  *   2. Recherche sparse (top 20) → scores lexicaux
  *   3. Fusion RRF ou weighted → top N résultats finaux
- * 
+ *
  * @param query - Question utilisateur
  * @param options - Options de recherche
  * @returns Sections scorées et fusionnées
@@ -348,18 +352,34 @@ export async function hybridSearch(
     console.log('\n🔍 Hybrid Search Debug:');
     console.log(`  Dense results: ${denseResults.length}`);
     console.log(`  Sparse results: ${sparseResults.length}`);
-    console.log(`  Top dense: ${denseResults.slice(0, 3).map(r => `${r.section.titre} (${r.score.toFixed(3)})`).join(', ')}`);
-    console.log(`  Top sparse: ${sparseResults.slice(0, 3).map(r => `${r.section.titre} (${r.score.toFixed(3)})`).join(', ')}`);
+    console.log(
+      `  Top dense: ${denseResults
+        .slice(0, 3)
+        .map((r) => `${r.section.titre} (${r.score.toFixed(3)})`)
+        .join(', ')}`,
+    );
+    console.log(
+      `  Top sparse: ${sparseResults
+        .slice(0, 3)
+        .map((r) => `${r.section.titre} (${r.score.toFixed(3)})`)
+        .join(', ')}`,
+    );
   }
 
   // 3. Fusion
-  const merged = fusionMethod === 'rrf'
-    ? fuseResultsRRF(denseResults, sparseResults, topN)
-    : fuseResultsWeighted(denseResults, sparseResults, topN);
+  const merged =
+    fusionMethod === 'rrf'
+      ? fuseResultsRRF(denseResults, sparseResults, topN)
+      : fuseResultsWeighted(denseResults, sparseResults, topN);
 
   if (debug) {
     console.log(`  Final merged: ${merged.length}`);
-    console.log(`  Top results: ${merged.slice(0, 3).map(r => `${r.section.titre} (${r.score.toFixed(3)})`).join(', ')}\n`);
+    console.log(
+      `  Top results: ${merged
+        .slice(0, 3)
+        .map((r) => `${r.section.titre} (${r.score.toFixed(3)})`)
+        .join(', ')}\n`,
+    );
   }
 
   return merged;
@@ -397,7 +417,10 @@ export async function hybridSearchBestGame(
   if (allResults.length === 0) return null;
 
   // Agrège les scores par jeu
-  const gameScores = new Map<string, { total: number; sections: ScoredSection[] }>();
+  const gameScores = new Map<
+    string,
+    { total: number; sections: ScoredSection[] }
+  >();
 
   for (const result of allResults) {
     const gameId = result.jeu_id;
