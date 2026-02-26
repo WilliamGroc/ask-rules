@@ -3,6 +3,7 @@
   import type { PageData } from './$types';
   import type { GameSectionType } from '../types';
   import SEO from '$lib/SEO.svelte';
+  import Markdown from '$lib/Markdown.svelte';
 
   export let data: PageData;
   export let form:
@@ -216,7 +217,9 @@
               Réponse
               <span class="model-tag">{form.model}</span>
             </div>
-            <p class="answer-text">{form.answer}</p>
+            <div class="answer-text">
+              <Markdown content={form.answer} />
+            </div>
           {:else}
             <p class="no-llm-notice">
               Aucun LLM configuré. Ajoutez <code>MISTRAL_API_KEY</code>,

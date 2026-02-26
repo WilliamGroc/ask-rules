@@ -50,8 +50,6 @@ const DEFAULT_TTL = 60 * 60 * 24;
  * Si Redis n'est pas configuré ou inaccessible, l'application continue sans cache.
  */
 async function getRedisClient(): Promise<BaseRedisClientType | null> {
-  console.log('[Cache] Initialisation du client Redis...');
-  console.log(`[Cache] redisClient déjà initialisé: ${!!redisClient}, redisAvailable: ${redisAvailable}`);
   // Déjà initialisé et disponible
   if (redisClient && redisAvailable) return redisClient;
 
@@ -62,7 +60,6 @@ async function getRedisClient(): Promise<BaseRedisClientType | null> {
     return null;
   }
 
-  console.log(`[Cache] REDIS_URL: ${process.env['REDIS_URL']}`);
   // Pas de configuration Redis
   const redisUrl = process.env['REDIS_URL'];
   if (!redisUrl) {
@@ -84,7 +81,7 @@ async function getRedisClient(): Promise<BaseRedisClientType | null> {
     redisClient = client as BaseRedisClientType;
     redisAvailable = true;
 
-    console.error('[Cache] Redis connecté avec succès');
+    console.log('[Cache] Redis connecté avec succès');
     return redisClient;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -131,7 +128,6 @@ export async function getCachedResponse(
   question: string,
   jeuId: string | null
 ): Promise<CachedResponse | null> {
-  console.log(`[Cache] Recherche en cache pour le jeu: "${jeuId}"`);
   const client = await getRedisClient();
   if (!client) return null;
 
@@ -167,13 +163,11 @@ export async function setCachedResponse(
   response: Omit<CachedResponse, 'cached' | 'cached_at'>,
   ttl?: number
 ): Promise<void> {
-  console.log(`[Cache] Mise en cache pour le jeu: "${jeuId}"`);
   const client = await getRedisClient();
   if (!client) return;
 
   try {
     const key = generateCacheKey(question, jeuId);
-    console.log(`[Cache] Stockage en cache avec clé: "${key}"`);
     const cacheData: CachedResponse = {
       ...response,
       cached: true,
