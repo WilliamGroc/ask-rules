@@ -9,6 +9,8 @@
 import { deleteGameFiles } from './fileStorage';
 import type { KnowledgeBaseEntry, StoredSection, GameMetadata, Statistics } from '../types';
 import pool from './db';
+import { logGameAdded, logGameUpdated, logGameDeleted } from './logger';
+import { logGameAdded, logGameUpdated } from './logger';
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
 
@@ -37,6 +39,10 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Vérifier si le jeu existe déjà
+    const existsResult = await client.query('SELECT 1 FROM games WHERE id = $1', [entry.id]);
+    const isUpdate = existsResult.rowCount !== null && existsResult.rowCount > 0;
 
     // Upsert du jeu
     await client.query(
@@ -96,6 +102,13 @@ export async function upsertGame(entry: KnowledgeBaseEntry): Promise<void> {
     }
 
     await client.query('COMMIT');
+
+    // Log l'événement (après commit réussi)
+    if (isUpdate) {
+      await logGameUpdated(entry.id, entry.jeu, entry.fichier, entry.sections.length);
+    } else {
+      await logGameAdded(entry.id, entry.jeu, entry.fichier, entry.sections.length);
+    }
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

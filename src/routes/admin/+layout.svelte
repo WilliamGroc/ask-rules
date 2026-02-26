@@ -31,6 +31,13 @@
         >
           📁 Fichiers
         </a>
+        <a
+          href="/admin/logs"
+          class="nav-link"
+          class:active={$page.url.pathname.startsWith('/admin/logs')}
+        >
+          📋 Logs
+        </a>
       </div>
 
       <form

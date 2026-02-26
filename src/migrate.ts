@@ -84,6 +84,32 @@ async function migrate(): Promise<void> {
     `);
     console.log('✔ Colonnes hierarchy_path / chunk_index / total_chunks présentes');
 
+    // ── Table logs (v4) ────────────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS logs (
+        id          SERIAL       PRIMARY KEY,
+        event_type  TEXT         NOT NULL,
+        message     TEXT         NOT NULL,
+        metadata    JSONB,
+        ip_address  TEXT,
+        user_agent  TEXT,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    console.log('✔ Table "logs" prête');
+
+    // Créer un index sur event_type et created_at pour les requêtes fréquentes
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS logs_event_type_idx ON logs(event_type);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS logs_created_at_idx ON logs(created_at DESC);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS logs_ip_address_idx ON logs(ip_address) WHERE ip_address IS NOT NULL;
+    `);
+    console.log('✔ Index sur logs créés');
+
     // ── Colonne full-text search (v3) ──────────────────────────────────────────
     await client.query(`
       ALTER TABLE sections

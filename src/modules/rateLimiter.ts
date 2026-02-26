@@ -7,7 +7,10 @@
  *   - Blocage temporaire (5 minutes) des IPs qui dépassent la limite
  *   - Utilise Redis si disponible, sinon mémoire locale
  *   - Nettoyage automatique des entrées expirées
+ *   - Logging des événements en base de données
  */
+
+import { logRateLimitBlocked } from './logger';
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -90,8 +93,13 @@ export interface RateLimitResult {
  * 
  * @param ip - Adresse IP du client
  * @param recordAttempt - Si true, enregistre la tentative (par défaut true)
+ * @param userAgent - User agent du client (optionnel, pour le logging)
  */
-export function checkRateLimit(ip: string, recordAttempt = true): RateLimitResult {
+export function checkRateLimit(
+  ip: string,
+  recordAttempt = true,
+  userAgent?: string
+): RateLimitResult {
   const now = Date.now();
   const entry = getOrCreateEntry(ip);
 
@@ -119,14 +127,20 @@ export function checkRateLimit(ip: string, recordAttempt = true): RateLimitResul
     // Dépasse la limite → bloquer l'IP
     entry.blockedUntil = now + BLOCK_DURATION_MS;
     const retryAfter = Math.ceil(BLOCK_DURATION_MS / 1000);
+    const blockDurationMinutes = Math.ceil(retryAfter / 60);
 
     console.warn(
       `[RateLimit] IP ${ip} bloquée pour ${retryAfter}s (${entry.requests.length} requêtes en 1 min)`
     );
 
+    // Log l'événement en base de données
+    logRateLimitBlocked(ip, blockDurationMinutes, userAgent).catch((err) => {
+      console.error('[RateLimit] Erreur lors du logging:', err);
+    });
+
     return {
       allowed: false,
-      reason: `Trop de requêtes (maximum ${MAX_REQUESTS_PER_MINUTE}/minute). Vous êtes bloqué pour ${Math.ceil(retryAfter / 60)} minutes.`,
+      reason: `Trop de requêtes (maximum ${MAX_REQUESTS_PER_MINUTE}/minute). Vous êtes bloqué pour ${blockDurationMinutes} minutes.`,
       retryAfter,
     };
   }

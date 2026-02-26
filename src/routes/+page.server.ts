@@ -39,8 +39,10 @@ export const actions: Actions = {
 
     // 1. Protection anti-spam : vérification du rate limit
     const clientIP = getClientIP(request.headers);
+    const userAgent = request.headers.get('user-agent') ?? undefined;
+
     if (!isWhitelisted(clientIP)) {
-      const rateCheck = checkRateLimit(clientIP);
+      const rateCheck = checkRateLimit(clientIP, true, userAgent);
       if (!rateCheck.allowed) {
         return fail(429, {
           ok: false as const,

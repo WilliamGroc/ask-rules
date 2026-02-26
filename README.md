@@ -177,6 +177,34 @@ Consultez [docs/RATE_LIMITING_GUIDE.md](docs/RATE_LIMITING_GUIDE.md) pour :
 - Déblocage manuel d'IPs
 - Tests et sécurité en production
 
+## Système de Logs
+
+Tous les événements importants sont enregistrés en base de données :
+
+### Événements loggés
+
+- 🎲 **Ajout/mise à jour de jeux** : Traçabilité des imports
+- 🚫 **Blocages anti-spam** : IPs bloquées par le rate limiter
+- 📊 **Statistiques** : Analyse de l'utilisation
+
+### Interface d'administration
+
+Accessible via `/admin/logs` avec :
+
+- Affichage chronologique groupé par date
+- Filtres par type d'événement
+- Détails complets (métadonnées, IP, user agent)
+
+### Documentation complète
+
+Consultez [docs/LOGS_GUIDE.md](docs/LOGS_GUIDE.md) pour :
+
+- Structure de la table et index
+- API de logging
+- Nettoyage et archivage
+- Monitoring et alertes
+- Considérations RGPD
+
 ## Format de sortie (resultat.json)
 
 ```json
