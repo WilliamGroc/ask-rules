@@ -270,6 +270,7 @@
           : ''}</span
       >
     {/if}
+    <span class="version">v{(data as any).version ?? '1.0.0'}</span>
   </footer>
 </div>
 

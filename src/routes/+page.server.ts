@@ -10,6 +10,9 @@
 import 'dotenv/config';
 
 import { fail } from '@sveltejs/kit';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { listGames, findGame } from '../modules/knowledgeBase';
 import { retrieveFromBestGame, retrieveForGame } from '../modules/retriever';
 import { queryLLM } from '../modules/llmClient';
@@ -22,7 +25,13 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
   const games = await listGames();
-  return { games };
+  
+  // Récupération de la version depuis package.json
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const pkgPath = path.join(__dirname, '../../../package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  
+  return { games, version: pkg.version };
 };
 
 // ── Configuration ─────────────────────────────────────────────────────────────
