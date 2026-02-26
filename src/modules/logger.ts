@@ -18,7 +18,8 @@ export type LogEventType =
   | 'game_updated'
   | 'game_deleted'
   | 'rate_limit_hit'
-  | 'rate_limit_blocked';
+  | 'rate_limit_blocked'
+  | 'file_validation_failed';
 
 export interface LogEntry {
   event_type: LogEventType;
@@ -144,6 +145,25 @@ export async function logRateLimitBlocked(
     },
     ip_address: ipAddress,
     user_agent: userAgent,
+  });
+}
+
+/**
+ * Log un échec de validation de fichier.
+ */
+export async function logFileValidationFailed(
+  fileName: string,
+  errors: string[],
+  details: Record<string, unknown>
+): Promise<void> {
+  await logEvent({
+    event_type: 'file_validation_failed',
+    message: `Fichier rejeté : ${fileName}`,
+    metadata: {
+      file_name: fileName,
+      errors,
+      ...details,
+    },
   });
 }
 

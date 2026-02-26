@@ -34,6 +34,8 @@ import {
 import { generateEmbeddingForSection } from '../../../modules/embedder';
 import { analyseFile } from '../../../pipeline';
 import { saveUploadedFile } from '../../../modules/fileStorage';
+import { validateFile } from '../../../modules/fileValidator';
+import { logFileValidationFailed } from '../../../modules/logger';
 
 // ── Helpers URL ───────────────────────────────────────────────────────────────
 
@@ -192,6 +194,39 @@ export const POST: RequestHandler = async ({ request }) => {
 
           // Sauvegarde permanente du fichier uploadé
           storedFilePath = saveUploadedFile(gameSlug, fichier.name, fileContent);
+        }
+
+        // ── Validation du fichier ─────────────────────────────────────────────
+        send({ type: 'step', message: 'Validation du fichier…' });
+
+        const validation = await validateFile(tmpPath, {
+          strictPdf: true,
+          minFrenchScore: 3,
+          minBoardGameScore: 3,
+        });
+
+        if (!validation.valid) {
+          const errorDetails = [
+            'Fichier invalide :',
+            ...validation.errors,
+            '',
+            `Détails de l'analyse :`,
+            `  • Format PDF : ${validation.details.isPdf ? '✓' : '✗'}`,
+            `  • Langue française : ${validation.details.isFrench ? '✓' : '✗'} (score: ${validation.details.frenchScore})`,
+            `  • Jeu de société : ${validation.details.isBoardGame ? '✓' : '✗'} (${validation.details.boardGameScore} mots-clés)`,
+          ].join('\n');
+
+          // Log l'échec de validation
+          await logFileValidationFailed(sourceFilename, validation.errors, validation.details);
+
+          send({ type: 'error', message: errorDetails });
+          return;
+        }
+
+        if (validation.warnings.length > 0) {
+          for (const warning of validation.warnings) {
+            send({ type: 'step', message: `⚠️ ${warning}` });
+          }
         }
 
         // ── Extraction + NLP ──────────────────────────────────────────────────

@@ -9,7 +9,6 @@
 import { deleteGameFiles } from './fileStorage';
 import type { KnowledgeBaseEntry, StoredSection, GameMetadata, Statistics } from '../types';
 import pool from './db';
-import { logGameAdded, logGameUpdated, logGameDeleted } from './logger';
 import { logGameAdded, logGameUpdated } from './logger';
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
