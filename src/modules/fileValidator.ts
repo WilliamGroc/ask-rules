@@ -10,139 +10,7 @@
 
 import path from 'node:path';
 import { extractText } from './textExtractor';
-
-// ── Configuration ──────────────────────────────────────────────────────────────
-
-// Mots-clés obligatoires pour détecter un jeu de société (présence d'au moins 3)
-const BOARD_GAME_KEYWORDS = [
-  'jeu',
-  'joueur',
-  'joueurs',
-  'plateau',
-  'carte',
-  'cartes',
-  'pion',
-  'pions',
-  'tour',
-  'tours',
-  'partie',
-  'règle',
-  'règles',
-  'victoire',
-  'gagner',
-  'perdre',
-  'action',
-  'actions',
-  'phase',
-  'phases',
-  'ressource',
-  'ressources',
-  'point',
-  'points',
-  'dé',
-  'dés',
-  'jeton',
-  'jetons',
-  'tuile',
-  'tuiles',
-  'mise en place',
-  'préparation',
-  'matériel',
-  'composants',
-  'défausser',
-  'piocher',
-  'mélanger',
-  'distribuer',
-];
-
-// Mots français courants pour détection de langue
-const FRENCH_WORDS = [
-  'le',
-  'la',
-  'les',
-  'un',
-  'une',
-  'des',
-  'et',
-  'ou',
-  'mais',
-  'donc',
-  'car',
-  'pour',
-  'dans',
-  'sur',
-  'avec',
-  'sans',
-  'pas',
-  'plus',
-  'très',
-  'aussi',
-  'vous',
-  'nous',
-  'ils',
-  'elles',
-  'qui',
-  'que',
-  'quoi',
-  'où',
-  'quand',
-  'comment',
-  'pourquoi',
-  'chaque',
-  'tout',
-  'tous',
-  'cette',
-  'ces',
-  'sont',
-  'être',
-  'avoir',
-  'faire',
-  'peut',
-  'doit',
-  'peut-être',
-];
-
-// Mots anglais courants (pour détection inverse)
-const ENGLISH_WORDS = [
-  'the',
-  'and',
-  'for',
-  'are',
-  'but',
-  'not',
-  'you',
-  'with',
-  'can',
-  'has',
-  'was',
-  'this',
-  'that',
-  'from',
-  'they',
-  'have',
-  'will',
-  'your',
-  'what',
-  'when',
-  'there',
-  'each',
-  'which',
-  'their',
-  'said',
-  'make',
-  'like',
-  'time',
-  'player',
-  'players',
-  'game',
-  'board',
-  'card',
-  'cards',
-  'dice',
-  'turn',
-  'round',
-  'victory',
-];
+import { STOPWORDS_FR, GAME_NOUNS } from '../utils/frenchWords';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -192,27 +60,25 @@ function countKeywords(text: string, keywords: string[]): number {
 
 /**
  * Calcule un score de français basé sur la fréquence de mots français.
+ * Retourne le ratio de mots français courants trouvés dans le texte.
  */
 function calculateFrenchScore(text: string): number {
   const normalized = normalizeText(text);
   const words = normalized.split(/\s+/).filter((w) => w.length > 1);
   if (words.length === 0) return 0;
 
-  const frenchCount = countKeywords(text, FRENCH_WORDS);
-  const englishCount = countKeywords(text, ENGLISH_WORDS);
+  const frenchCount = countKeywords(text, [...STOPWORDS_FR]);
 
-  // Score basé sur le ratio de mots français vs anglais
-  const frenchRatio = frenchCount / Math.max(words.length / 10, 1); // Normalisé par rapport à la taille
-  const englishPenalty = englishCount / Math.max(words.length / 10, 1);
-
-  return Math.max(0, frenchRatio - englishPenalty * 0.5);
+  // Score basé sur le ratio de mots français par rapport au nombre total de mots
+  // On normalise par tranches de 10 mots pour obtenir un score exploitable
+  return frenchCount / Math.max(words.length / 10, 1);
 }
 
 /**
  * Calcule un score de jeu de société basé sur les mots-clés.
  */
 function calculateBoardGameScore(text: string): number {
-  return countKeywords(text, BOARD_GAME_KEYWORDS);
+  return countKeywords(text, [...GAME_NOUNS]);
 }
 
 // ── Fonction principale ────────────────────────────────────────────────────────
