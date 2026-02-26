@@ -110,13 +110,13 @@ function normalizeQuestion(question: string): string {
 
 /**
  * Génère une clé de cache unique basée sur la question et le jeu.
- * Format: ask-rules:q:{hash}:{jeu_id}
+ * Format: reglomatic:q:{hash}:{jeu_id}
  */
 export function generateCacheKey(question: string, jeuId: string | null): string {
   const normalized = normalizeQuestion(question);
   const hash = createHash('sha256').update(normalized).digest('hex').slice(0, 16);
   const jeuPart = jeuId ?? 'auto';
-  return `ask-rules:q:${hash}:${jeuPart}`;
+  return `reglomatic:q:${hash}:${jeuPart}`;
 }
 
 // ── API publique ───────────────────────────────────────────────────────────────

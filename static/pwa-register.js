@@ -25,7 +25,7 @@ async function registerServiceWorker() {
 
               // Afficher une notification à l'utilisateur (optionnel)
               if (
-                confirm('Une nouvelle version de Ask Rules est disponible. Voulez-vous recharger ?')
+                confirm('Une nouvelle version de Reglomatic est disponible. Voulez-vous recharger ?')
               ) {
                 newWorker.postMessage({ type: 'SKIP_WAITING' });
                 window.location.reload();

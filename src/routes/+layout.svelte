@@ -5,7 +5,7 @@
 </script>
 
 <nav class="nav">
-  <a href="/" class="nav-brand">Ask Rules</a>
+  <a href="/" class="nav-brand">Reglomatic</a>
   <div class="nav-links">
     <a href="/" class="nav-link" class:active={$page.url.pathname === '/'}>Poser une question</a>
     <a href="/import" class="nav-link" class:active={$page.url.pathname === '/import'}

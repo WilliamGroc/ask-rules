@@ -1,5 +1,5 @@
 /**
- * migrate.ts — Initialise le schéma PostgreSQL pour ask-rules
+ * migrate.ts — Initialise le schéma PostgreSQL pour reglomatic
  *
  * Usage :
  *   ts-node src/migrate.ts

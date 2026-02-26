@@ -1,5 +1,5 @@
 {
-  "name": "ask-rules",
+  "name": "reglomatic",
   "version": "1.0.0",
   "description": "PoC - Analyse de règles de jeu de société en français avec NLP",
   "main": "dist/index.js",

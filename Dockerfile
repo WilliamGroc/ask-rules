@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 # ════════════════════════════════════════════════════════════════════════════
-# ask-rules — Image de production
+# reglomatic — Image de production
 # SvelteKit (adapter-node) + pgvector + modèle d'embedding local
 #
-# Construction : docker build -t ask-rules .
+# Construction : docker build -t reglomatic .
 # Lancement    : docker run -p 3000:3000 \
 #                  -e DATABASE_URL=... \
 #                  -e MISTRAL_API_KEY=... \
-#                  ask-rules
+#                  reglomatic
 # ════════════════════════════════════════════════════════════════════════════
 
 # ── Stage 1 : Dépendances (dev + prod, nécessaires au build) ─────────────────

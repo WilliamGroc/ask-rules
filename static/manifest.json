@@ -1,6 +1,6 @@
 {
-  "name": "Ask Rules - Assistant IA pour jeux de société",
-  "short_name": "Ask Rules",
+  "name": "Reglomatic - Assistant IA pour jeux de société",
+  "short_name": "Reglomatic",
   "description": "Posez des questions sur vos règles de jeux de société et obtenez des réponses instantanées grâce à notre IA",
   "start_url": "/",
   "display": "standalone",
@@ -33,7 +33,11 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["games", "utilities", "reference"],
+  "categories": [
+    "games",
+    "utilities",
+    "reference"
+  ],
   "lang": "fr-FR",
   "dir": "ltr",
   "scope": "/",

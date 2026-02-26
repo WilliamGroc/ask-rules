@@ -92,7 +92,7 @@
     <div class="pwa-content">
       <div class="pwa-icon">📱</div>
       <div class="pwa-text">
-        <strong>Installez Ask Rules</strong>
+        <strong>Installez Reglomatic</strong>
         <p>Accédez rapidement à vos règles de jeux, même hors ligne !</p>
       </div>
     </div>

@@ -12,7 +12,7 @@
   <div class="admin-layout">
     <nav class="admin-nav">
       <div class="admin-nav-header">
-        <a href="/" class="admin-brand">← Ask Rules</a>
+        <a href="/" class="admin-brand">← Reglomatic</a>
         <h1>Administration</h1>
       </div>
 

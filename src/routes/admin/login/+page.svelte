@@ -9,8 +9,8 @@
 </script>
 
 <SEO
-  title="Connexion Admin - Ask Rules"
-  description="Page de connexion à l'interface d'administration Ask Rules"
+  title="Connexion Admin - Reglomatic"
+  description="Page de connexion à l'interface d'administration Reglomatic"
 />
 
 <!-- Robots meta pour bloquer l'indexation -->

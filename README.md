@@ -125,7 +125,7 @@ Pour réduire les coûts d'API et améliorer les performances, un système de ca
 
 ```bash
 # 1. Lancer Redis (Docker)
-docker run -d -p 6379:6379 --name ask-rules-redis redis:7-alpine
+docker run -d -p 6379:6379 --name reglomatic-redis redis:7-alpine
 
 # 2. Configurer l'application (.env)
 REDIS_URL=redis://localhost:6379

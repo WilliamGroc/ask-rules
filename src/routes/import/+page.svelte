@@ -110,7 +110,7 @@
 </script>
 
 <SEO
-  title="Importer des règles - Ask Rules"
+  title="Importer des règles - Reglomatic"
   description="Importez et indexez vos règles de jeux de société au format PDF ou TXT. Notre IA analyse automatiquement les règles pour répondre à vos questions."
   keywords="importer règles, PDF jeu de société, indexation règles, upload règles jeu, analyse règles PDF"
 />

@@ -41,6 +41,6 @@ Dimensions : 1200x630px
 Contenu suggéré :
 
 - Logo centré
-- Texte : "Ask Rules"
+- Texte : "Reglomatic"
 - Sous-titre : "Assistant IA pour règles de jeux"
 - Fond avec dégradé indigo

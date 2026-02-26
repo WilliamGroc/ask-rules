@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'ask-rules-v1';
+const CACHE_NAME = 'reglomatic-v1';
 const OFFLINE_URL = '/';
 
 // Liste des fichiers à mettre en cache lors de l'installation

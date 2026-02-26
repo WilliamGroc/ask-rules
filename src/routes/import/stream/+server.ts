@@ -78,7 +78,7 @@ async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename:
   }
 
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'ask-rules-bot/1.0' },
+    headers: { 'User-Agent': 'reglomatic-bot/1.0' },
     signal: AbortSignal.timeout(30_000),
   });
 
@@ -104,7 +104,7 @@ async function fetchUrlToTemp(url: string): Promise<{ tmpPath: string; filename:
     content = Buffer.from(await response.text(), 'utf-8');
   }
 
-  const tmpPath = path.join(os.tmpdir(), `ask-rules-url-${Date.now()}${ext}`);
+  const tmpPath = path.join(os.tmpdir(), `reglomatic-url-${Date.now()}${ext}`);
   fs.writeFileSync(tmpPath, new Uint8Array(content));
 
   // Nom de fichier lisible : chemin URL ou hostname
@@ -187,7 +187,7 @@ export const POST: RequestHandler = async ({ request }) => {
             });
             return;
           }
-          tmpPath = path.join(os.tmpdir(), `ask-rules-${Date.now()}${ext}`);
+          tmpPath = path.join(os.tmpdir(), `reglomatic-${Date.now()}${ext}`);
           const fileContent = new Uint8Array(await fichier.arrayBuffer());
           fs.writeFileSync(tmpPath, fileContent);
           sourceFilename = fichier.name;

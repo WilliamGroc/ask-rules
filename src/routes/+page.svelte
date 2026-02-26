@@ -71,7 +71,7 @@
 </script>
 
 <SEO
-  title="Ask Rules — Assistant IA pour règles de jeux de société"
+  title="Reglomatic — Assistant IA pour règles de jeux de société"
   description="Posez des questions sur vos jeux de société préférés et obtenez des réponses instantanées grâce à notre IA. Recherche intelligente dans les règles de vos jeux."
   keywords="jeux de société, règles de jeu, IA, assistant intelligent, board games, questions réponses, recherche règles, aide jeu de société"
 />
@@ -79,7 +79,7 @@
 <div class="page">
   <!-- En-tête -->
   <header class="header">
-    <h1 class="logo">Ask Rules</h1>
+    <h1 class="logo">Reglomatic</h1>
     <p class="tagline">Posez une question sur vos règles de jeu de société</p>
   </header>
 
