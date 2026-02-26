@@ -117,6 +117,39 @@ npx ts-node src/analyser.ts data/manuel.txt --embed
 
 **Ordre de priorité** : Transformers.js → OpenAI → TF-IDF.
 
+## Cache Redis
+
+Pour réduire les coûts d'API et améliorer les performances, un système de cache Redis a été intégré :
+
+### Configuration
+
+```bash
+# 1. Lancer Redis (Docker)
+docker run -d -p 6379:6379 --name ask-rules-redis redis:7-alpine
+
+# 2. Configurer l'application (.env)
+REDIS_URL=redis://localhost:6379
+
+# 3. Installer les dépendances
+pnpm install
+```
+
+### Fonctionnement
+
+- ✅ **Cache automatique** : Les questions/réponses sont mises en cache pendant 24h
+- ✅ **Normalisation** : Les questions similaires utilisent le même cache
+- ✅ **Mode graceful** : Si Redis n'est pas disponible, l'app continue sans cache
+- ⚡ **Performance** : ~50-200ms depuis le cache vs 1-5s depuis le LLM
+
+### Documentation complète
+
+Consultez [docs/REDIS_CACHE_GUIDE.md](docs/REDIS_CACHE_GUIDE.md) pour :
+
+- Configuration détaillée
+- Services Redis managés (AWS, Redis Cloud, etc.)
+- Commandes de monitoring
+- Dépannage
+
 ## Format de sortie (resultat.json)
 
 ```json

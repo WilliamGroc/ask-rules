@@ -37,6 +37,7 @@
     "natural": "8.1.0",
     "pdf-parse": "^2.4.5",
     "pg": "8.18.0",
+    "redis": "^4.7.0",
     "svelte": "5.53.3"
   },
   "devDependencies": {

@@ -35,6 +35,9 @@
   let selectedGame = '';
   let lastQuestion = '';
   let formEl: HTMLFormElement;
+  let questionText = '';
+
+  const MAX_QUESTION_LENGTH = 500;
 
   const suggestedQuestions = [
     'Comment jouer ?',
@@ -53,12 +56,16 @@
   }
 
   function fillQuestion(question: string) {
+    questionText = question;
     const textarea = formEl.querySelector('textarea[name="question"]') as HTMLTextAreaElement;
     if (textarea) {
-      textarea.value = question;
       textarea.focus();
     }
   }
+
+  $: charCount = questionText.length;
+  $: isNearLimit = charCount > MAX_QUESTION_LENGTH * 0.8;
+  $: isAtLimit = charCount >= MAX_QUESTION_LENGTH;
 </script>
 
 <SEO
@@ -105,15 +112,22 @@
       {/each}
     </div>
 
-    <textarea
-      name="question"
-      class="question-input"
-      placeholder="Ex : Comment se déroule un combat ? Combien de joueurs ?"
-      required
-      rows="3"
-      disabled={isLoading}
-      on:keydown={handleTextareaKeydown}
-    ></textarea>
+    <div class="question-wrapper">
+      <textarea
+        name="question"
+        class="question-input"
+        placeholder="Ex : Comment se déroule un combat ? Combien de joueurs ?"
+        required
+        rows="3"
+        maxlength={MAX_QUESTION_LENGTH}
+        disabled={isLoading}
+        bind:value={questionText}
+        on:keydown={handleTextareaKeydown}
+      ></textarea>
+      <div class="char-counter" class:warning={isNearLimit} class:danger={isAtLimit}>
+        {charCount} / {MAX_QUESTION_LENGTH}
+      </div>
+    </div>
 
     <div class="form-footer">
       {#if data.games.length > 1}
@@ -281,5 +295,33 @@
   .tag-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .question-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .char-counter {
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.75rem;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    transition: color 0.3s ease;
+  }
+
+  .char-counter.warning {
+    color: rgba(255, 200, 100, 0.8);
+  }
+
+  .char-counter.danger {
+    color: rgba(255, 100, 100, 0.9);
+    font-weight: 600;
   }
 </style>
