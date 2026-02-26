@@ -235,6 +235,22 @@ body {
   line-height: 1.5;
 }
 
+.error-card.rate-limited {
+  background: rgba(251, 146, 60, 0.12);
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fb923c;
+}
+
+.error-message {
+  font-weight: 500;
+}
+
+.retry-info {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
 .error-icon {
   font-size: 1rem;
   flex-shrink: 0;

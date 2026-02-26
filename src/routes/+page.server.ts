@@ -15,6 +15,7 @@ import { retrieveFromBestGame, retrieveForGame } from '../modules/retriever';
 import { queryLLM } from '../modules/llmClient';
 import { buildContext } from '../modules/contextBuilder';
 import { getCachedResponse, setCachedResponse } from '../modules/cacheClient';
+import { checkRateLimit, getClientIP, isWhitelisted } from '../modules/rateLimiter';
 import type { Actions, PageServerLoad } from './$types';
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -36,6 +37,20 @@ export const actions: Actions = {
     const question = String(formData.get('question') ?? '').trim();
     const jeuFilter = String(formData.get('jeu') ?? '').trim() || null;
 
+    // 1. Protection anti-spam : vérification du rate limit
+    const clientIP = getClientIP(request.headers);
+    if (!isWhitelisted(clientIP)) {
+      const rateCheck = checkRateLimit(clientIP);
+      if (!rateCheck.allowed) {
+        return fail(429, {
+          ok: false as const,
+          error: rateCheck.reason ?? 'Trop de requêtes.',
+          retryAfter: rateCheck.retryAfter,
+        });
+      }
+    }
+
+    // 2. Validation de la question
     if (!question) {
       return fail(400, { ok: false as const, error: 'Question manquante.' });
     }
@@ -48,13 +63,13 @@ export const actions: Actions = {
     }
 
     try {
-      // 1. Vérification du cache
+      // 3. Vérification du cache
       const cached = await getCachedResponse(question, jeuFilter);
       if (cached) {
         return { ok: true as const, ...cached };
       }
 
-      // 2. Cache manquant : récupération des sections pertinentes
+      // 4. Cache manquant : récupération des sections pertinentes
       const topN = 4;
 
       // Active l'hybrid search (dense + sparse) pour une meilleure pertinence
@@ -71,20 +86,20 @@ export const actions: Actions = {
         });
       }
 
-      // 3. Récupère les métadonnées du jeu pour enrichir le contexte
+      // 5. Récupère les métadonnées du jeu pour enrichir le contexte
       const gameEntry = await findGame(selection.jeu_id);
       const gameMetadata = gameEntry?.metadata;
 
-      // 4. Construit le contexte enrichi avec toutes les métadonnées disponibles
+      // 6. Construit le contexte enrichi avec toutes les métadonnées disponibles
       const context = buildContext(selection.sections, selection.jeu, {
         format: 'enriched', // ou 'compact' pour un format plus concis
         gameMetadata,
       });
 
-      // 5. Appel du LLM
+      // 7. Appel du LLM
       const llm = await queryLLM(question, context);
 
-      // 6. Préparation de la réponse
+      // 8. Préparation de la réponse
       const response = {
         jeu: selection.jeu,
         jeu_id: selection.jeu_id,
@@ -104,7 +119,7 @@ export const actions: Actions = {
         })),
       };
 
-      // 7. Mise en cache de la réponse
+      // 9. Mise en cache de la réponse
       await setCachedResponse(question, jeuFilter, response);
 
       return {

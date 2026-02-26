@@ -28,6 +28,7 @@
     | {
         ok: false;
         error: string;
+        retryAfter?: number;
       }
     | null;
 
@@ -161,9 +162,18 @@
   {#if form}
     <section class="result-section" aria-live="polite">
       {#if !form.ok}
-        <div class="error-card" role="alert">
-          <span class="error-icon">⚠</span>
-          {form.error}
+        <div class="error-card{form.retryAfter ? ' rate-limited' : ''}" role="alert">
+          <span class="error-icon">{form.retryAfter ? '🚫' : '⚠'}</span>
+          <div>
+            <div class="error-message">{form.error}</div>
+            {#if form.retryAfter}
+              <div class="retry-info">
+                Réessayez dans {Math.ceil(form.retryAfter / 60)} minute{form.retryAfter > 60
+                  ? 's'
+                  : ''}.
+              </div>
+            {/if}
+          </div>
         </div>
       {:else}
         <!-- Question posée -->

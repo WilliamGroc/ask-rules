@@ -150,6 +150,33 @@ Consultez [docs/REDIS_CACHE_GUIDE.md](docs/REDIS_CACHE_GUIDE.md) pour :
 - Commandes de monitoring
 - Dépannage
 
+## Protection Anti-Spam
+
+Un système de rate limiting protège l'application contre les abus :
+
+### Fonctionnement
+
+- 🛡️ **Limite** : Maximum 10 questions par minute par IP
+- ⏱️ **Blocage** : 5 minutes après dépassement
+- 🎯 **Détection IP** : Support des proxies (X-Forwarded-For, X-Real-IP)
+- ✅ **Whitelist** : IPs exemptées configurables
+
+### Configuration
+
+```env
+# Optionnel : IPs exemptées du rate limiting
+RATE_LIMIT_WHITELIST=127.0.0.1,::1
+```
+
+### Documentation complète
+
+Consultez [docs/RATE_LIMITING_GUIDE.md](docs/RATE_LIMITING_GUIDE.md) pour :
+
+- Personnalisation des limites
+- Monitoring et statistiques
+- Déblocage manuel d'IPs
+- Tests et sécurité en production
+
 ## Format de sortie (resultat.json)
 
 ```json
