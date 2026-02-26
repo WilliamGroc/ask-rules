@@ -50,23 +50,23 @@ const DEFAULT_TTL = 60 * 60 * 24;
  * Si Redis n'est pas configuré ou inaccessible, l'application continue sans cache.
  */
 async function getRedisClient(): Promise<BaseRedisClientType | null> {
+  console.log('[Cache] Initialisation du client Redis...');
+  console.log(`[Cache] redisClient déjà initialisé: ${!!redisClient}, redisAvailable: ${redisAvailable}`);
   // Déjà initialisé et disponible
   if (redisClient && redisAvailable) return redisClient;
 
-  // Déjà tenté et échoué
-  if (redisClient === null && redisAvailable === false) return null;
-
   // Redis désactivé via variable d'environnement
   if (process.env['REDIS_ENABLED'] === 'false') {
-    console.warn('[Cache] Redis désactivé via REDIS_ENABLED=false');
+    console.error('[Cache] Redis désactivé via REDIS_ENABLED=false');
     redisAvailable = false;
     return null;
   }
 
+  console.log(`[Cache] REDIS_URL: ${process.env['REDIS_URL']}`);
   // Pas de configuration Redis
   const redisUrl = process.env['REDIS_URL'];
   if (!redisUrl) {
-    console.warn('[Cache] REDIS_URL non défini, cache désactivé');
+    console.error('[Cache] REDIS_URL non défini, cache désactivé');
     redisAvailable = false;
     return null;
   }
@@ -84,12 +84,12 @@ async function getRedisClient(): Promise<BaseRedisClientType | null> {
     redisClient = client as BaseRedisClientType;
     redisAvailable = true;
 
-    console.warn('[Cache] Redis connecté avec succès');
+    console.error('[Cache] Redis connecté avec succès');
     return redisClient;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`[Cache] Impossible de se connecter à Redis: ${msg}`);
-    console.warn('[Cache] L\'application continuera sans cache');
+    console.error(`[Cache] Impossible de se connecter à Redis: ${msg}`);
+    console.error('[Cache] L\'application continuera sans cache');
     redisAvailable = false;
     return null;
   }
@@ -131,6 +131,7 @@ export async function getCachedResponse(
   question: string,
   jeuId: string | null
 ): Promise<CachedResponse | null> {
+  console.log(`[Cache] Recherche en cache pour le jeu: "${jeuId}"`);
   const client = await getRedisClient();
   if (!client) return null;
 
@@ -142,7 +143,7 @@ export async function getCachedResponse(
       const data = JSON.parse(cached) as CachedResponse;
       // Cache HIT - log en dev uniquement
       if (process.env['NODE_ENV'] !== 'production') {
-        console.warn(`[Cache] HIT pour: "${question.slice(0, 50)}..."`);
+        console.error(`[Cache] HIT pour: "${question.slice(0, 50)}..."`);
       }
       return { ...data, cached: true };
     }
@@ -166,11 +167,13 @@ export async function setCachedResponse(
   response: Omit<CachedResponse, 'cached' | 'cached_at'>,
   ttl?: number
 ): Promise<void> {
+  console.log(`[Cache] Mise en cache pour le jeu: "${jeuId}"`);
   const client = await getRedisClient();
   if (!client) return;
 
   try {
     const key = generateCacheKey(question, jeuId);
+    console.log(`[Cache] Stockage en cache avec clé: "${key}"`);
     const cacheData: CachedResponse = {
       ...response,
       cached: true,
@@ -180,7 +183,7 @@ export async function setCachedResponse(
     await client.setEx(key, ttl ?? DEFAULT_TTL, JSON.stringify(cacheData));
     // Log en dev uniquement
     if (process.env['NODE_ENV'] !== 'production') {
-      console.warn(`[Cache] Stocké: "${question.slice(0, 50)}..."`);
+      console.error(`[Cache] Stocké: "${question.slice(0, 50)}..."`);
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -195,7 +198,7 @@ export async function closeCacheClient(): Promise<void> {
   if (redisClient && redisClient.isOpen) {
     try {
       await redisClient.quit();
-      console.warn('[Cache] Connexion Redis fermée');
+      console.error('[Cache] Connexion Redis fermée');
     } catch (error) {
       console.error('[Cache] Erreur lors de la fermeture:', error);
     }
