@@ -19,7 +19,8 @@ export interface ValidationResult {
   errors: string[];
   warnings: string[];
   details: {
-    isPdf: boolean;
+    isValidFormat: boolean;
+    fileFormat: string;
     isFrench: boolean;
     isBoardGame: boolean;
     frenchScore: number;
@@ -96,14 +97,14 @@ function calculateBoardGameScore(text: string): number {
 export async function validateFile(
   filePath: string,
   options: {
-    strictPdf?: boolean; // Si true, rejette les non-PDF (défaut: true)
+    acceptedFormats?: string[]; // Formats acceptés (défaut: ['.pdf', '.txt'])
     minFrenchScore?: number; // Score minimum de français (défaut: 3)
     minBoardGameScore?: number; // Nombre minimum de mots-clés jeux (défaut: 3)
     sampleSize?: number; // Nombre de caractères à analyser (défaut: 2000)
   } = {}
 ): Promise<ValidationResult> {
   const {
-    strictPdf = true,
+    acceptedFormats = ['.pdf', '.txt'],
     minFrenchScore = 3,
     minBoardGameScore = 3,
     sampleSize = 2000,
@@ -112,14 +113,13 @@ export async function validateFile(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // 1. Vérification du format PDF
+  // 1. Vérification du format
   const ext = path.extname(filePath).toLowerCase();
-  const isPdf = ext === '.pdf';
+  const isValidFormat = acceptedFormats.includes(ext);
 
-  if (strictPdf && !isPdf) {
-    errors.push('Le fichier doit être au format PDF.');
-  } else if (!isPdf) {
-    warnings.push(`Le fichier n'est pas un PDF (extension: ${ext}).`);
+  if (!isValidFormat) {
+    const formatsStr = acceptedFormats.join(', ');
+    errors.push(`Le fichier doit être dans un des formats acceptés : ${formatsStr} (reçu: ${ext}).`);
   }
 
   // 2. Extraction d'un échantillon de texte
@@ -138,7 +138,8 @@ export async function validateFile(
         errors,
         warnings,
         details: {
-          isPdf,
+          isValidFormat,
+          fileFormat: ext,
           isFrench: false,
           isBoardGame: false,
           frenchScore: 0,
@@ -155,7 +156,8 @@ export async function validateFile(
       errors,
       warnings,
       details: {
-        isPdf,
+        isValidFormat,
+        fileFormat: ext,
         isFrench: false,
         isBoardGame: false,
         frenchScore: 0,
@@ -194,7 +196,8 @@ export async function validateFile(
     errors,
     warnings,
     details: {
-      isPdf,
+      isValidFormat,
+      fileFormat: ext,
       isFrench,
       isBoardGame,
       frenchScore: parseFloat(frenchScore.toFixed(1)),

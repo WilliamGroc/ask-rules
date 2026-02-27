@@ -34,7 +34,7 @@ async function getExtractor(): Promise<any> {
       } catch {
         throw new Error(
           'La bibliothèque "@huggingface/transformers" n\'est pas installée.\n' +
-            'Exécutez : pnpm add @huggingface/transformers'
+          'Exécutez : pnpm add @huggingface/transformers'
         );
       }
 
@@ -50,7 +50,7 @@ async function getExtractor(): Promise<any> {
         extractorInstance = await pipeline(
           'feature-extraction',
           'Xenova/multilingual-e5-small',
-          { quantized: false } // fp32 par défaut, plus stable
+          { quantized: false, dtype: 'fp32' } // fp32 explicite, plus stable
         );
         return extractorInstance;
       } catch (err) {
@@ -62,7 +62,7 @@ async function getExtractor(): Promise<any> {
         extractorInstance = await pipeline(
           'feature-extraction',
           'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-          { quantized: true }
+          { quantized: true, dtype: 'q8' }
         );
         return extractorInstance;
       } catch (err) {

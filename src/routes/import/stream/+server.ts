@@ -200,7 +200,7 @@ export const POST: RequestHandler = async ({ request }) => {
         send({ type: 'step', message: 'Validation du fichier…' });
 
         const validation = await validateFile(tmpPath, {
-          strictPdf: true,
+          acceptedFormats: ['.pdf', '.txt'],
           minFrenchScore: 3,
           minBoardGameScore: 3,
         });
@@ -211,7 +211,7 @@ export const POST: RequestHandler = async ({ request }) => {
             ...validation.errors,
             '',
             `Détails de l'analyse :`,
-            `  • Format PDF : ${validation.details.isPdf ? '✓' : '✗'}`,
+            `  • Format fichier : ${validation.details.isValidFormat ? '✓' : '✗'} (${validation.details.fileFormat})`,
             `  • Langue française : ${validation.details.isFrench ? '✓' : '✗'} (score: ${validation.details.frenchScore})`,
             `  • Jeu de société : ${validation.details.isBoardGame ? '✓' : '✗'} (${validation.details.boardGameScore} mots-clés)`,
           ].join('\n');
