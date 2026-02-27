@@ -11,11 +11,12 @@ import 'dotenv/config';
 
 import { fail } from '@sveltejs/kit';
 import { listGames, findGame } from '../modules/knowledgeBase';
-import { retrieveFromBestGame, retrieveForGame } from '../modules/retriever';
+import { retrieveFromBestGame, retrieveForGame, retrieveForOverview } from '../modules/retriever';
 import { queryLLM } from '../modules/llmClient';
 import { buildContext } from '../modules/contextBuilder';
 import { getCachedResponse, setCachedResponse } from '../modules/cacheClient';
 import { checkRateLimit, getClientIP, isWhitelisted } from '../modules/rateLimiter';
+import { detectIntent } from '../modules/intentDetector';
 import type { Actions, PageServerLoad } from './$types';
 
 // ── Load ──────────────────────────────────────────────────────────────────────
@@ -75,15 +76,49 @@ export const actions: Actions = {
         return { ok: true as const, ...cached };
       }
 
-      // 4. Cache manquant : récupération des sections pertinentes
-      const topN = 4;
+      // 4. Détection de l'intention de la question
+      const intent = detectIntent(question);
+      const isOverview = intent.intent === 'overview';
 
-      // Active l'hybrid search (dense + sparse) pour une meilleure pertinence
+      // 5. Récupération des sections adaptée à l'intention
+      const topN = isOverview ? intent.recommendedSections : 4;
       const useHybrid = true;
 
-      const selection = jeuFilter
-        ? await retrieveForGame(question, jeuFilter, topN, { useHybrid })
-        : await retrieveFromBestGame(question, topN, 0.1, { useHybrid });
+      let selection;
+
+      if (isOverview) {
+        // Pour les questions de vue d'ensemble, utilise la stratégie spécialisée
+        if (jeuFilter) {
+          // Résout d'abord le gameId depuis le nom du jeu
+          const normalize = (s: string) =>
+            s
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '');
+          const needle = normalize(jeuFilter);
+          const gamesRes = await listGames();
+          const match = gamesRes.find((g) => normalize(g.jeu).includes(needle));
+          const gameId = match?.id;
+          selection = await retrieveForOverview(
+            question,
+            gameId,
+            intent.prioritySections,
+            topN
+          );
+        } else {
+          selection = await retrieveForOverview(
+            question,
+            undefined,
+            intent.prioritySections,
+            topN
+          );
+        }
+      } else {
+        // Pour les questions spécifiques, utilise la recherche standard
+        selection = jeuFilter
+          ? await retrieveForGame(question, jeuFilter, topN, { useHybrid })
+          : await retrieveFromBestGame(question, topN, 0.1, { useHybrid });
+      }
 
       if (!selection || selection.sections.length === 0) {
         return fail(404, {
@@ -92,20 +127,21 @@ export const actions: Actions = {
         });
       }
 
-      // 5. Récupère les métadonnées du jeu pour enrichir le contexte
+      // 6. Récupère les métadonnées du jeu pour enrichir le contexte
       const gameEntry = await findGame(selection.jeu_id);
       const gameMetadata = gameEntry?.metadata;
 
-      // 6. Construit le contexte enrichi avec toutes les métadonnées disponibles
+      // 7. Construit le contexte adapté à l'intention
+      const contextFormat = isOverview ? 'overview' : 'enriched';
       const context = buildContext(selection.sections, selection.jeu, {
-        format: 'enriched', // ou 'compact' pour un format plus concis
+        format: contextFormat,
         gameMetadata,
       });
 
-      // 7. Appel du LLM
+      // 8. Appel du LLM
       const llm = await queryLLM(question, context);
 
-      // 8. Préparation de la réponse
+      // 9. Préparation de la réponse
       const response = {
         jeu: selection.jeu,
         jeu_id: selection.jeu_id,
@@ -125,7 +161,7 @@ export const actions: Actions = {
         })),
       };
 
-      // 9. Mise en cache de la réponse
+      // 10. Mise en cache de la réponse
       await setCachedResponse(question, jeuFilter, response);
 
       return {

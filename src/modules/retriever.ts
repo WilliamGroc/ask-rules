@@ -22,7 +22,7 @@
 import pool from './db';
 import { generateEmbedding } from './embedder';
 import { hybridSearchForGame, hybridSearchBestGame } from './hybridSearch';
-import type { ScoredSection, StoredSection } from '../types';
+import type { ScoredSection, StoredSection, GameSectionType } from '../types';
 
 /** Résultat de la sélection d'un jeu pour une requête donnée. */
 export interface GameSelection {
@@ -317,5 +317,128 @@ async function selectBestGameByScore(
     relevanceScore: bestScore,
     matchedName: false,
     sections: bestSections.slice(0, topN),
+  };
+}
+
+// ── Recherche pour questions overview ─────────────────────────────────────────
+
+/**
+ * Récupère les sections clés pour une question de type "résumé" ou "vue d'ensemble".
+ * 
+ * Stratégie :
+ *   1. Utilise l'hybrid search si disponible
+ *   2. Récupère plus de sections (8-10)
+ *   3. Priorise les sections clés selon leur type_section
+ *   4. Rééquilibre les scores pour favoriser les sections structurantes
+ * 
+ * @param query - Question utilisateur
+ * @param gameId - ID du jeu (optionnel, sinon détection auto)
+ * @param prioritySections - Types de sections à prioriser
+ * @param topN - Nombre de sections à retourner (défaut: 8)
+ */
+export async function retrieveForOverview(
+  query: string,
+  gameId?: string,
+  prioritySections: GameSectionType[] = [
+    'presentation',
+    'but_du_jeu',
+    'tour_de_jeu',
+    'victoire',
+    'preparation',
+    'materiel',
+  ],
+  topN = 8
+): Promise<GameSelection | null> {
+  // Si pas de gameId, détecte le meilleur jeu d'abord
+  let targetGameId = gameId;
+  let gameName = '';
+  let matchedName = false;
+
+  if (!targetGameId) {
+    const gamesRes = await pool.query<{ id: string; jeu: string }>(
+      'SELECT id, jeu FROM games ORDER BY jeu'
+    );
+    if (gamesRes.rowCount === 0) return null;
+
+    const games = gamesRes.rows;
+
+    if (games.length === 1) {
+      targetGameId = games[0].id;
+      gameName = games[0].jeu;
+    } else {
+      // Détecte si un jeu est nommé dans la question
+      const named = games.find((g) => gameNameInQuery(g.jeu, query));
+      if (named) {
+        targetGameId = named.id;
+        gameName = named.jeu;
+        matchedName = true;
+      } else {
+        // Utilise l'hybrid search pour trouver le meilleur jeu
+        const selection = await retrieveFromBestGame(query, 3, 0.1, { useHybrid: true });
+        if (!selection) return null;
+        targetGameId = selection.jeu_id;
+        gameName = selection.jeu;
+      }
+    }
+  }
+
+  // Récupère le nom du jeu si pas encore défini
+  if (!gameName) {
+    const res = await pool.query<{ jeu: string }>('SELECT jeu FROM games WHERE id = $1', [
+      targetGameId,
+    ]);
+    if (res.rowCount === 0) return null;
+    gameName = res.rows[0].jeu;
+  }
+
+  // Récupère les sections avec l'embedding de la question
+  const queryEmbedding = await generateEmbedding(query);
+  const vectorLiteral = toVectorLiteral(queryEmbedding);
+
+  // Récupère plus de sections que demandé pour avoir le choix
+  const fetchLimit = topN * 2;
+
+  const res = await pool.query(
+    `SELECT s.id, s.game_id, g.jeu, s.titre, s.contenu, s.niveau,
+            s.type_section, s.entites, s.actions, s.resume, s.mecaniques,
+            s.page_debut, s.page_fin,
+            1 - (s.embedding <=> $1::vector) AS score
+     FROM sections s
+     JOIN games g ON g.id = s.game_id
+     WHERE s.game_id = $2
+       AND s.embedding IS NOT NULL
+     ORDER BY s.embedding <=> $1::vector
+     LIMIT $3`,
+    [vectorLiteral, targetGameId, fetchLimit]
+  );
+
+  if (res.rowCount === 0) return null;
+
+  let sections = res.rows.map(rowToScoredSection);
+
+  // Applique un boost aux sections prioritaires
+  const PRIORITY_BOOST = 0.15; // +15% au score
+  sections = sections.map((s) => {
+    if (prioritySections.includes(s.section.type_section)) {
+      return {
+        ...s,
+        score: Math.min(1.0, s.score * (1 + PRIORITY_BOOST)),
+      };
+    }
+    return s;
+  });
+
+  // Retrie après le boost et limite au topN
+  sections.sort((a, b) => b.score - a.score);
+  sections = sections.slice(0, topN);
+
+  const relevanceScore = sections.slice(0, 3).reduce((s, r) => s + r.score, 0);
+
+  return {
+    jeu: gameName,
+    jeu_id: targetGameId,
+    relevanceScore,
+    matchedName,
+    sections,
   };
 }

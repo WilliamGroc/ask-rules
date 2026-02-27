@@ -313,8 +313,8 @@ export function buildCompactContext(sections: ScoredSection[]): string {
  * Type d'export pour faciliter l'utilisation.
  */
 export interface ContextBuilderOptions {
-  /** Format de contexte : 'enriched' (défaut) ou 'compact' */
-  format?: 'enriched' | 'compact';
+  /** Format de contexte : 'enriched' (défaut), 'compact', ou 'overview' */
+  format?: 'enriched' | 'compact' | 'overview';
   /** Métadonnées du jeu (optionnel) */
   gameMetadata?: {
     joueurs_min?: number | null;
@@ -339,5 +339,168 @@ export function buildContext(
     return buildCompactContext(sections);
   }
 
+  if (format === 'overview') {
+    return buildOverviewContext(sections, gameName, gameMetadata);
+  }
+
   return buildEnrichedContext(sections, gameName, gameMetadata);
+}
+
+/**
+ * Format optimisé pour les questions de vue d'ensemble / résumé.
+ * Met l'accent sur :
+ *   - Les résumés extractifs plutôt que le contenu complet
+ *   - Les métadonnées structurelles (type de section, hiérarchie)
+ *   - Une présentation plus concise et synthétique
+ */
+function buildOverviewContext(
+  sections: ScoredSection[],
+  gameName: string,
+  gameMetadata?: ContextBuilderOptions['gameMetadata']
+): string {
+  if (sections.length === 0) {
+    return 'Aucune section pertinente trouvée.';
+  }
+
+  const lines: string[] = [];
+
+  // ── En-tête ───────────────────────────────────────────────────────────────
+
+  lines.push('═════════════════════════════════════════════════════════════════════════');
+  lines.push(`  VUE D'ENSEMBLE — ${gameName.toUpperCase()}`);
+  lines.push('═════════════════════════════════════════════════════════════════════════');
+
+  // ── Métadonnées du jeu ────────────────────────────────────────────────────
+
+  if (gameMetadata) {
+    const meta: string[] = [];
+
+    if (gameMetadata.joueurs_min || gameMetadata.joueurs_max) {
+      const min = gameMetadata.joueurs_min ?? '?';
+      const max = gameMetadata.joueurs_max ?? '?';
+      meta.push(`👥 ${min}–${max} joueurs`);
+    }
+
+    if (gameMetadata.age_minimum) {
+      meta.push(`🎂 ${gameMetadata.age_minimum}+`);
+    }
+
+    if (gameMetadata.duree_minutes_min || gameMetadata.duree_minutes_max) {
+      const min = gameMetadata.duree_minutes_min ?? '?';
+      const max = gameMetadata.duree_minutes_max ?? '?';
+      if (min === max) {
+        meta.push(`⏱️  ${min} min`);
+      } else {
+        meta.push(`⏱️  ${min}–${max} min`);
+      }
+    }
+
+    if (meta.length > 0) {
+      lines.push('');
+      lines.push(meta.join(' • '));
+    }
+  }
+
+  lines.push('');
+  lines.push('─────────────────────────────────────────────────────────────────────────');
+  lines.push('');
+
+  // ── Sections sous forme de résumés ────────────────────────────────────────
+
+  // Groupe les sections par type pour une meilleure organisation
+  const sectionsByType = new Map<string, ScoredSection[]>();
+  const typeOrder = [
+    'presentation',
+    'but_du_jeu',
+    'materiel',
+    'preparation',
+    'tour_de_jeu',
+    'victoire',
+    'regles_speciales',
+    'variante',
+    'autre',
+  ];
+
+  for (const section of sections) {
+    const type = section.section.type_section;
+    if (!sectionsByType.has(type)) {
+      sectionsByType.set(type, []);
+    }
+    sectionsByType.get(type)!.push(section);
+  }
+
+  // Affiche les sections dans l'ordre logique
+  const typeLabels: Record<string, string> = {
+    presentation: '📖 PRÉSENTATION',
+    but_du_jeu: '🎯 BUT DU JEU',
+    materiel: '🎲 MATÉRIEL',
+    preparation: '⚙️  PRÉPARATION',
+    tour_de_jeu: '🔄 TOUR DE JEU',
+    victoire: '🏆 VICTOIRE',
+    regles_speciales: '⚡ RÈGLES SPÉCIALES',
+    variante: '🎨 VARIANTES',
+    autre: '📌 AUTRES INFORMATIONS',
+  };
+
+  let isFirst = true;
+  for (const type of typeOrder) {
+    const typeSections = sectionsByType.get(type);
+    if (!typeSections || typeSections.length === 0) continue;
+
+    if (!isFirst) {
+      lines.push('');
+      lines.push('─────────────────────────────────────────────────────────────────────────');
+      lines.push('');
+    }
+    isFirst = false;
+
+    lines.push(typeLabels[type] || `📄 ${type.toUpperCase()}`);
+    lines.push('');
+
+    for (const scoredSection of typeSections) {
+      const { section } = scoredSection;
+
+      // Titre de section
+      lines.push(`▸ ${section.titre}`);
+
+      // Pages si disponibles
+      const pages = formatPages(section.page_debut, section.page_fin);
+      if (pages) {
+        lines.push(`  ${pages}`);
+      }
+
+      // Résumé extractif prioritaire
+      if (section.resume && section.resume.trim().length > 0) {
+        lines.push('');
+        lines.push(`  ${section.resume}`);
+      } else {
+        // Si pas de résumé, extraire les premières phrases du contenu
+        const preview = truncateAtSentence(section.contenu, 300);
+        lines.push('');
+        lines.push(`  ${preview}`);
+      }
+
+      // Entités clés si disponibles
+      if (section.entites && section.entites.length > 0) {
+        const entities = formatList(section.entites, MAX_ENTITIES);
+        lines.push(`  🔹 Éléments clés : ${entities}`);
+      }
+
+      // Mécaniques si disponibles
+      if (section.mecaniques && section.mecaniques.length > 0) {
+        const mechanics = formatList(section.mecaniques, 4);
+        lines.push(`  ⚙️  Mécaniques : ${mechanics}`);
+      }
+
+      lines.push('');
+    }
+  }
+
+  // ── Pied de page ──────────────────────────────────────────────────────────
+
+  lines.push('═════════════════════════════════════════════════════════════════════════');
+  lines.push(`  FIN DE LA VUE D'ENSEMBLE — ${sections.length} section${sections.length > 1 ? 's' : ''}`);
+  lines.push('═════════════════════════════════════════════════════════════════════════');
+
+  return lines.join('\n');
 }
